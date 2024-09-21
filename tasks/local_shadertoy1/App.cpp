@@ -1,14 +1,22 @@
 #include "App.hpp"
 
+#include <chrono>
 #include <etna/Etna.hpp>
 #include <etna/GlobalContext.hpp>
 #include <etna/PipelineManager.hpp>
+#include <etna/RenderTargetStates.hpp>
+#include <ratio>
+#include <spdlog/spdlog.h>
+#include <vulkan/vulkan_core.h>
+#include <vulkan/vulkan_enums.hpp>
 
 
 App::App()
   : resolution{1280, 720}
   , useVsync{true}
 {
+
+  timeStart = std::chrono::high_resolution_clock::now();
   // First, we need to initialize Vulkan, which is not trivial because
   // extensions are required for just about anything.
   {
@@ -73,7 +81,19 @@ App::App()
   // How it is actually performed is not trivial, but we can skip this for now.
   commandManager = etna::get_context().createPerFrameCmdMgr();
 
+  etna::create_program("toy_compute", {LOCAL_SHADERTOY_SHADERS_ROOT "toy.comp.spv"});
+  
+  pipeline = etna::get_context().getPipelineManager().createComputePipeline("toy_compute", {});
+  
+  mainImage = etna::get_context().createImage(etna::Image::CreateInfo{
+    // .extent = vk::Extent3D{640, 360, 1},
+    .extent = vk::Extent3D{resolution.x, resolution.y, 1},
+    .name = "mainImage",
+    .format = vk::Format::eR8G8B8A8Snorm,
+    .imageUsage = vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage,
+  });
 
+  defaultSampler = etna::Sampler(etna::Sampler::CreateInfo{.name = "default_sampler"});
   // TODO: Initialize any additional resources you require here!
 }
 
@@ -98,6 +118,9 @@ void App::run()
 
 void App::drawFrame()
 {
+  // This is cursed but I don't care;
+  float frameTime = std::chrono::duration<float, std::ratio<1,1>>(std::chrono::high_resolution_clock::now() - timeStart).count();
+
   // First, get a command buffer to write GPU commands into.
   auto currentCmdBuf = commandManager->acquireNext();
 
@@ -135,11 +158,74 @@ void App::drawFrame()
       // As with set_state, Etna sometimes flushes on it's own.
       // Usually, flushes should be placed before "action", i.e. compute dispatches
       // and blit/copy operations.
+
+      etna::set_state(
+        currentCmdBuf,
+        mainImage.get(),
+        // We are going to use the texture at the transfer stage...
+        vk::PipelineStageFlagBits2::eComputeShader,
+        // ...to transfer-write stuff into it...
+        vk::AccessFlagBits2::eShaderWrite,
+        // ...and want it to have the appropriate layout.
+        vk::ImageLayout::eGeneral,
+        vk::ImageAspectFlagBits::eColor);
       etna::flush_barriers(currentCmdBuf);
 
 
       // TODO: Record your commands here!
+      auto toyComputeInfo = etna::get_shader_program("toy_compute");
 
+      auto set = etna::create_descriptor_set(
+      toyComputeInfo.getDescriptorLayoutId(0),
+      currentCmdBuf,
+      {
+        etna::Binding{0, mainImage.genBinding(defaultSampler.get(), vk::ImageLayout::eGeneral)},
+      });
+
+      vk::DescriptorSet vkSet = set.getVkSet();
+
+      currentCmdBuf.bindPipeline(vk::PipelineBindPoint::eCompute, pipeline.getVkPipeline());
+      currentCmdBuf.bindDescriptorSets(
+        vk::PipelineBindPoint::eCompute, pipeline.getVkPipelineLayout(), 0, 1, &vkSet, 0, nullptr);
+
+      currentCmdBuf.pushConstants(
+        pipeline.getVkPipelineLayout(), vk::ShaderStageFlagBits::eCompute, 0, sizeof(float), &frameTime);
+      etna::flush_barriers(currentCmdBuf);
+
+      currentCmdBuf.dispatch((resolution.x + 31) / 32, (resolution.y + 31) / 32, 1);
+
+      etna::set_state(
+        currentCmdBuf,
+        mainImage.get(),
+        // We are going to use the texture at the transfer stage...
+        vk::PipelineStageFlagBits2::eTransfer,
+        // ...to transfer-read stuff from it...
+        vk::AccessFlagBits2::eTransferRead,
+        // ...and want it to have the appropriate layout.
+        vk::ImageLayout::eTransferSrcOptimal,
+        vk::ImageAspectFlagBits::eColor);
+
+      std::array<vk::Offset3D, 2> offsSrc = {
+        vk::Offset3D{},
+        vk::Offset3D{.x =static_cast<int32_t>(resolution.x), .y=static_cast<int32_t>(resolution.y), .z = 1}
+        // vk::Offset3D{.x =640, .y=360, .z = 1}
+      };
+
+      std::array<vk::Offset3D, 2> offsDst = {
+        vk::Offset3D{},
+        vk::Offset3D{.x =static_cast<int32_t>(resolution.x), .y=static_cast<int32_t>(resolution.y), .z = 1}
+      };
+
+      std::array<vk::ImageBlit, 1> blit = {
+        vk::ImageBlit{
+            .srcSubresource = {.aspectMask=vk::ImageAspectFlagBits::eColor, .layerCount=1,},
+            .srcOffsets = offsSrc,
+            .dstSubresource = {.aspectMask=vk::ImageAspectFlagBits::eColor, .layerCount=1},
+            .dstOffsets = offsDst,
+          }
+      };
+      etna::flush_barriers(currentCmdBuf);
+      currentCmdBuf.blitImage(mainImage.get(), vk::ImageLayout::eTransferSrcOptimal, backbuffer, vk::ImageLayout::eTransferDstOptimal, blit, vk::Filter::eNearest);
 
       // At the end of "rendering", we are required to change how the pixels of the
       // swpchain image are laid out in memory to something that is appropriate

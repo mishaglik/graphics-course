@@ -80,8 +80,7 @@ Renderer::render( vk::CommandBuffer cmd_buf,
             vk::PipelineStageFlagBits2::eFragmentShader, 
             {}, 
             vk::ImageLayout::eGeneral, 
-            vk::ImageAspectFlagBits::eColor,
-            6
+            vk::ImageAspectFlagBits::eColor
         );
         etna::flush_barriers(cmd_buf);
 
@@ -103,12 +102,11 @@ Renderer::render( vk::CommandBuffer cmd_buf,
                 {{0, 0}, {2048, 2048}
                 },
                 {{.image = skybox.get(), .view = skybox.getView({
+                    .baseLayer = i,
                     .layerCount = 1, 
-                    .baseArrayLayer = i,
                     .type = vk::ImageViewType::e2D, 
                     })}},
-                {},
-                1
+                {}
                 );
             
             cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, skyboxPipeline.getVkPipeline());

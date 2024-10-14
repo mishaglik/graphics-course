@@ -1,19 +1,26 @@
-#version 430
+#version 450
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_GOOGLE_include_directive : require
 
 #include "sdf.glsl"
 #include "figures.glsl"
 
-layout(local_size_x = 32, local_size_y = 32) in;
+layout(location = 0) out vec4 color;
 
-layout(binding = 0, rgba8) uniform image2D resultImage;
+layout (location = 0 ) in VS_OUT
+{
+  vec2 texCoord;
+} surf;
 
 layout(push_constant) uniform params
 {
   float iTime;
 } pushConstant;
 
+layout(binding = 0, set = 0) uniform data
+{
+    int _;
+};
 
 const vec3  eye      = vec3  (0, 0, 10);
 const float period   = 22.;
@@ -197,7 +204,7 @@ int hash( int x ) {
     return x;
 }
 
-
+const vec2 resultImageSize = vec2(1280, 720);
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
@@ -205,8 +212,8 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     vec3 meye =  eye;
     mat3 m = mat3(vec3(1,0,0), vec3(0,1,0), vec3(0,0,1));
     
-    vec2 scale = 9.0 * imageSize(resultImage).xy / max ( imageSize(resultImage).x, imageSize(resultImage).y ) ;
-    vec2 uv    = scale * ( fragCoord / imageSize(resultImage).xy - vec2 ( 0.5 ) );
+    vec2 scale = 9.0 * resultImageSize.xy / max ( resultImageSize.x, resultImageSize.y ) ;
+    vec2 uv    = scale * ( fragCoord / resultImageSize.xy - vec2 ( 0.5 ) );
     vec3 dir   = normalize ( vec3 ( uv, 0 ) - meye );
     vec4 color = vec4 ( 0, 0, 0, 1 );
     vec4 surf  = vec4 ( 1, 1, 1, 1 );
@@ -236,12 +243,8 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
 
 void main()
 {
-  ivec2 uv = ivec2(gl_GlobalInvocationID.xy);
-  vec4 color;
+  // comptatibility with previous
+  ivec2 uv = ivec2(vec2(surf.texCoord.x, 1. - surf.texCoord.y) * vec2(resultImageSize));
   mainImage(color, uv);
-// Final rotation of image
-  uv.y = imageSize(resultImage).y - uv.y;
-
-  if (uv.x < imageSize(resultImage).x && uv.y < imageSize(resultImage).y)
-    imageStore(resultImage, uv, color);
+  //color = vec4(surf.texCoord, 0, 1);
 }

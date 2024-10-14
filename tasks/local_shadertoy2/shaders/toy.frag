@@ -1,19 +1,27 @@
-#version 430
+#version 450
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_GOOGLE_include_directive : require
 
 #include "sdf.glsl"
 #include "figures.glsl"
 
-layout(local_size_x = 32, local_size_y = 32) in;
+layout(location = 0) out vec4 color;
 
-layout(binding = 0, rgba8) uniform image2D resultImage;
+layout (location = 0 ) in VS_OUT
+{
+  vec2 texCoord;
+} surf;
 
 layout(push_constant) uniform params
 {
   float iTime;
 } pushConstant;
 
+layout(binding = 0) uniform samplerCube cubeMap;
+
+layout(binding = 1) uniform sampler2D texBricks;
+layout(binding = 2) uniform sampler2D texPebbles;
+layout(binding = 3) uniform sampler2D texRust;
 
 const vec3  eye      = vec3  (0, 0, 10);
 const float period   = 22.;
@@ -33,12 +41,15 @@ float dRazmetka(in vec3 p, in vec3 pos, in vec3 size)
     
 }
 
-vec4 lamp(in vec3 p, in vec3 pos)
+vec4 lamp(in vec3 p, in vec3 pos, float trueZ)
 {
     vec3 height = vec3(0.0, 6.0, 0.0);
     float topR = 0.1;
     
-    return vec4(1., 1., 1., UnionFigures( 
+    vec2 tcd = vec2(0.1 * p.y + trueZ, 2. * acos(normalize(p - pos).x)) * rotate(trueZ);
+    vec4 textureColor = texture(texRust, tcd);
+    
+    return vec4(2. * textureColor.rgb, UnionFigures( 
             smoothUnion(
                 dCylinder(p, pos, pos + 0.3 * height, topR),
                 dCylinder(p, pos, pos +       height, topR),
@@ -61,10 +72,11 @@ vec4 lamp(in vec3 p, in vec3 pos)
 
 vec4 road(in vec3 p)
 {
+    vec4 textureColor = texture(texPebbles, 2. * p.xz);
     return UnionFigures(
-        vec4(0.1, 0.1, 0.1, dPlane    (p, vec4 (0, 1, 0, 1.8))),
-        vec4(0.8, 0.8, 0.0, dRazmetka (p, vec3(2.5, -1.8, 1), vec3(0.2, 0.1, 2))),
-        vec4(0.3, 0.3, 0.3, UnionFigures(
+        vec4(0.1,  0.1 , 0.1, dPlane    (p, vec4 (0, 1, 0, 1.8 + 0.1 * textureColor.r))),
+        vec4(0.76, 0.77, 0.2, dRazmetka (p, vec3(2.5, -1.90, 1), vec3(0.14, 0.1, 2))),
+        vec4(0.3,  0.3 , 0.3, UnionFigures(
             SubtractFigures(dAABox (p, vec3(-100, 0.1, 50.1)), dAABox(p, vec3(0,   -1.6, 50))),
             SubtractFigures(dAABox (p, vec3(   5, 0.1, 50.1)), dAABox(p, vec3(100, -1.6, 50)))
             ))
@@ -80,9 +92,10 @@ vec4 housing(in vec3 p)
     if (pr.y > 0.) {
         pr.y = mod(pr.y, 4.1);
     }
+    vec4 textureColor = texture(texBricks, p.yz);
     return SubtractFigures(
         vec4(0.0, 0.0, 0.0, dBox(pr, vec3(-1., 1, 0.7), vec3(0.1, 1.4, 0.7))),
-        vec4(0.4, 0.2, 0.0, dAABox(p, vec3(-1, 30, 50)))
+        vec4(0.6 * textureColor.rgb, dAABox(p, vec3(-1, 30, 50)))
         );
 }
 
@@ -93,7 +106,7 @@ vec4 sdf ( in vec3 p, in mat3 m)
    qr.z = mod(qr.z, period);
    return UnionFigures(
         road(q), 
-        lamp(qr, vec3(5.3, -1.6, 0.5 * period)),
+        lamp(qr, vec3(5.3, -1.6, 0.5 * period), q.z),
         housing(q)
     );
 }
@@ -108,13 +121,13 @@ vec3 trace ( in vec3 from, in vec3 dir, out bool hit, in mat3 m, out vec4 surf)
         
         for ( int steps = 0; steps < maxSteps; steps++ )
         {
-                surf = sdf ( p, m);
+                surf = sdf (p, m);
                 float dist = prec * surf.w;
         
                 if ( dist < eps )
                 {
-                    hit = true;
-                    break;
+                        hit = true;
+                        break;
                 }
     
                 totalDist += dist;
@@ -197,16 +210,17 @@ int hash( int x ) {
     return x;
 }
 
-
+const vec2 resultImageSize = vec2(1280, 720);
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
+
     bool hit;
     vec3 meye =  eye;
     mat3 m = mat3(vec3(1,0,0), vec3(0,1,0), vec3(0,0,1));
-    
-    vec2 scale = 9.0 * imageSize(resultImage).xy / max ( imageSize(resultImage).x, imageSize(resultImage).y ) ;
-    vec2 uv    = scale * ( fragCoord / imageSize(resultImage).xy - vec2 ( 0.5 ) );
+
+    vec2 scale = 9.0 * resultImageSize.xy / max ( resultImageSize.x, resultImageSize.y ) ;
+    vec2 uv    = scale * ( fragCoord / resultImageSize.xy - vec2 ( 0.5 ) );
     vec3 dir   = normalize ( vec3 ( uv, 0 ) - meye );
     vec4 color = vec4 ( 0, 0, 0, 1 );
     vec4 surf  = vec4 ( 1, 1, 1, 1 );
@@ -225,10 +239,12 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
                 }
                 
         
-        if (dot(color, vec4(1,1,1,0)) < 0.1) {
-            color =  0.1 * ambientOcclusion(p, generateNormal( p, 1e-5, m ), m) * surf;
+            if (dot(color, vec4(1,1,1,0)) < 0.1) {
+                color =  0.15 * ambientOcclusion(p, generateNormal( p, 1e-5, m ), m) * surf;
+            }
+        } else {
+            color = texture(cubeMap, dir);
         }
-        } 
 
     // Output to screen
     fragColor = color;
@@ -236,12 +252,8 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
 
 void main()
 {
-  ivec2 uv = ivec2(gl_GlobalInvocationID.xy);
-  vec4 color;
+  // comptatibility with previous
+  ivec2 uv = ivec2(vec2(surf.texCoord.x, 1. - surf.texCoord.y) * vec2(resultImageSize));
   mainImage(color, uv);
-// Final rotation of image
-  uv.y = imageSize(resultImage).y - uv.y;
-
-  if (uv.x < imageSize(resultImage).x && uv.y < imageSize(resultImage).y)
-    imageStore(resultImage, uv, color);
+  //color = vec4(surf.texCoord, 0, 1);
 }

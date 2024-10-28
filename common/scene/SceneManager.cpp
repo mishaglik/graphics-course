@@ -145,6 +145,88 @@ static std::uint32_t encode_normal(glm::vec3 normal)
   return sx | sy;
 }
 
+SceneManager::ProcessedMeshes SceneManager::processMeshesBaked(const tinygltf::Model& model) const
+{
+  // NOTE: glTF assets can have pretty wonky data layouts which are not appropriate
+  // for real-time rendering, so we have to press the data first. In serious engines
+  // this is mitigated by storing assets on the disc in an engine-specific format that
+  // is appropriate for GPU upload right after reading from disc.
+
+  ProcessedMeshes result;
+
+  // Pre-allocate enough memory so as not to hit the
+  // allocator on the memcpy hotpath
+  {
+    std::size_t vertexBytes = 0;
+    std::size_t vertexOffset = 0;
+    std::size_t indexBytes = 0;
+
+    for (const auto& bufView : model.bufferViews)
+    {
+      switch (bufView.target)
+      {
+      case TINYGLTF_TARGET_ARRAY_BUFFER:
+        // We search for last buffer view
+        vertexBytes = bufView.byteLength;
+        vertexOffset = bufView.byteOffset;
+        break;
+      case TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER:
+        // We search for last buffer view
+        indexBytes = bufView.byteLength;
+        break;
+      default:
+        break;
+      }
+    }
+    result.vertices.resize(vertexBytes / sizeof(Vertex));
+    result.indices.resize(indexBytes / sizeof(std::uint32_t));
+    std::memcpy(result.indices.data() , model.buffers.back().data.data(), indexBytes);
+    std::memcpy(result.vertices.data(), model.buffers.back().data.data() + vertexOffset, vertexBytes);
+  }
+  
+
+  {
+    std::size_t totalPrimitives = 0;
+    for (const auto& mesh : model.meshes)
+      totalPrimitives += mesh.primitives.size();
+    result.relems.reserve(totalPrimitives);
+  }
+
+  result.meshes.reserve(model.meshes.size());
+
+  size_t idxOffset = 0;
+  size_t vrtOffset = 0;
+  for (const auto& mesh : model.meshes)
+  {
+    result.meshes.push_back(Mesh{
+      .firstRelem = static_cast<std::uint32_t>(result.relems.size()),
+      .relemCount = static_cast<std::uint32_t>(mesh.primitives.size()),
+    });
+
+    for (const auto& prim : mesh.primitives)
+    {
+      if (prim.mode != TINYGLTF_MODE_TRIANGLES)
+      {
+        spdlog::warn(
+          "Encountered a non-triangles primitive, these are not supported for now, skipping it!");
+        --result.meshes.back().relemCount;
+        continue;
+      }
+
+      result.relems.push_back(RenderElement{
+        .vertexOffset = static_cast<std::uint32_t>(vrtOffset),
+        .indexOffset = static_cast<std::uint32_t>(idxOffset),
+        .indexCount = static_cast<std::uint32_t>(model.accessors[prim.indices].count),
+      });
+
+      idxOffset += model.accessors[prim.indices                  ].count;
+      vrtOffset += model.accessors[prim.attributes.at("POSITION")].count;
+    }
+  }
+
+  return result;
+}
+
 SceneManager::ProcessedMeshes SceneManager::processMeshes(const tinygltf::Model& model) const
 {
   // NOTE: glTF assets can have pretty wonky data layouts which are not appropriate
@@ -389,6 +471,31 @@ void SceneManager::selectScene(std::filesystem::path path)
   instanceMeshes = std::move(instMeshes);
 
   auto [verts, inds, relems, meshs] = processMeshes(model);
+
+  renderElements = std::move(relems);
+  meshes = std::move(meshs);
+
+  uploadData(verts, inds);
+}
+
+void SceneManager::selectSceneBaked(std::filesystem::path path)
+{
+  auto maybeModel = loadModel(path);
+  if (!maybeModel.has_value())
+    return;
+
+  auto model = std::move(*maybeModel);
+
+  // By aggregating all SceneManager fields mutations here,
+  // we guarantee that we don't forget to clear something
+  // when re-loading a scene.
+
+  // NOTE: you might want to store these on the GPU for GPU-driven rendering.
+  auto [instMats, instMeshes] = processInstances(model);
+  instanceMatrices = std::move(instMats);
+  instanceMeshes = std::move(instMeshes);
+
+  auto [verts, inds, relems, meshs] = processMeshesBaked(model);
 
   renderElements = std::move(relems);
   meshes = std::move(meshs);

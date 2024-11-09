@@ -145,6 +145,24 @@ static std::uint32_t encode_normal(glm::vec3 normal)
   return sx | sy;
 }
 
+
+glm::mat2x3 SceneManager::getBounds(std::span<const SceneManager::Vertex> vtx) {
+  glm::vec3 min = vtx[0].positionAndNormal;
+  glm::vec3 max = vtx[0].positionAndNormal;
+  for (const auto& v : vtx) {
+    min.x = std::min(min.x, v.positionAndNormal.x);
+    min.y = std::min(min.y, v.positionAndNormal.y);
+    min.z = std::min(min.z, v.positionAndNormal.z);
+
+    max.x = std::max(max.x, v.positionAndNormal.x);
+    max.y = std::max(max.y, v.positionAndNormal.y);
+    max.z = std::max(max.z, v.positionAndNormal.z);
+  }
+  glm::vec3 center = (max + min) / 2.f;
+  glm::vec3 extent = (max - min) / 2.f;
+  return {center, extent};
+}
+
 SceneManager::ProcessedMeshes SceneManager::processMeshesBaked(const tinygltf::Model& model) const
 {
   // NOTE: glTF assets can have pretty wonky data layouts which are not appropriate
@@ -190,8 +208,8 @@ SceneManager::ProcessedMeshes SceneManager::processMeshesBaked(const tinygltf::M
     for (const auto& mesh : model.meshes)
       totalPrimitives += mesh.primitives.size();
     result.relems.reserve(totalPrimitives);
+    result.bounds.reserve(totalPrimitives);
   }
-
   result.meshes.reserve(model.meshes.size());
 
   size_t idxOffset = 0;
@@ -212,15 +230,16 @@ SceneManager::ProcessedMeshes SceneManager::processMeshesBaked(const tinygltf::M
         --result.meshes.back().relemCount;
         continue;
       }
-
+      std::size_t vrtCount = model.accessors[prim.attributes.at("POSITION")].count;
       result.relems.push_back(RenderElement{
         .vertexOffset = static_cast<std::uint32_t>(vrtOffset),
         .indexOffset = static_cast<std::uint32_t>(idxOffset),
         .indexCount = static_cast<std::uint32_t>(model.accessors[prim.indices].count),
       });
+      result.bounds.emplace_back(getBounds(std::span(result.vertices).subspan(vrtOffset, vrtCount)));
 
-      idxOffset += model.accessors[prim.indices                  ].count;
-      vrtOffset += model.accessors[prim.attributes.at("POSITION")].count;
+      idxOffset += model.accessors[prim.indices].count;
+      vrtOffset += vrtCount;
     }
   }
 
@@ -264,6 +283,7 @@ SceneManager::ProcessedMeshes SceneManager::processMeshes(const tinygltf::Model&
     for (const auto& mesh : model.meshes)
       totalPrimitives += mesh.primitives.size();
     result.relems.reserve(totalPrimitives);
+    result.bounds.reserve(totalPrimitives);
   }
 
   result.meshes.reserve(model.meshes.size());
@@ -320,7 +340,7 @@ SceneManager::ProcessedMeshes SceneManager::processMeshes(const tinygltf::Model&
         .vertexOffset = static_cast<std::uint32_t>(result.vertices.size()),
         .indexOffset = static_cast<std::uint32_t>(result.indices.size()),
         .indexCount = static_cast<std::uint32_t>(accessors[0]->count),
-      });
+      }); 
 
       const std::size_t vertexCount = accessors[1]->count;
 
@@ -426,6 +446,7 @@ SceneManager::ProcessedMeshes SceneManager::processMeshes(const tinygltf::Model&
           ptrs[0],
           sizeof(result.indices[0]) * indexCount);
       }
+      result.bounds.emplace_back(getBounds(std::span(result.vertices).subspan(result.relems.back().vertexOffset, vertexCount)));
     }
   }
 
@@ -470,10 +491,11 @@ void SceneManager::selectScene(std::filesystem::path path)
   instanceMatrices = std::move(instMats);
   instanceMeshes = std::move(instMeshes);
 
-  auto [verts, inds, relems, meshs] = processMeshes(model);
+  auto [verts, inds, relems, meshs, bbs] = processMeshes(model);
 
   renderElements = std::move(relems);
   meshes = std::move(meshs);
+  bounds = std::move(bbs);
 
   uploadData(verts, inds);
 }
@@ -495,10 +517,11 @@ void SceneManager::selectSceneBaked(std::filesystem::path path)
   instanceMatrices = std::move(instMats);
   instanceMeshes = std::move(instMeshes);
 
-  auto [verts, inds, relems, meshs] = processMeshesBaked(model);
+  auto [verts, inds, relems, meshs, bbs] = processMeshesBaked(model);
 
   renderElements = std::move(relems);
   meshes = std::move(meshs);
+  bounds = std::move(bbs);
 
   uploadData(verts, inds);
 }

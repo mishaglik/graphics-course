@@ -47,6 +47,7 @@ public:
 
   // Every relem is a single draw call
   std::span<const RenderElement> getRenderElements() { return renderElements; }
+  std::span<const glm::mat2x3  > getBounds()         { return bounds; }
 
   vk::Buffer getVertexBuffer() { return unifiedVbuf.get(); }
   vk::Buffer getIndexBuffer() { return unifiedIbuf.get(); }
@@ -54,6 +55,7 @@ public:
   etna::VertexByteStreamFormatDescription getVertexFormatDescription();
 
 private:
+
   std::optional<tinygltf::Model> loadModel(std::filesystem::path path);
 
   struct ProcessedInstances
@@ -73,6 +75,7 @@ private:
   };
 
   static_assert(sizeof(Vertex) == sizeof(float) * 8);
+  static glm::mat2x3 getBounds(std::span<const Vertex>);
 
   struct ProcessedMeshes
   {
@@ -80,6 +83,7 @@ private:
     std::vector<std::uint32_t> indices;
     std::vector<RenderElement> relems;
     std::vector<Mesh> meshes;
+    std::vector<glm::mat2x3> bounds;
   };
   ProcessedMeshes processMeshes(const tinygltf::Model& model) const;
   ProcessedMeshes processMeshesBaked(const tinygltf::Model& model) const;
@@ -94,6 +98,7 @@ private:
   std::vector<Mesh> meshes;
   std::vector<glm::mat4x4> instanceMatrices;
   std::vector<std::uint32_t> instanceMeshes;
+  std::vector<glm::mat2x3> bounds;
 
   etna::Buffer unifiedVbuf;
   etna::Buffer unifiedIbuf;

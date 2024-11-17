@@ -25,7 +25,7 @@ public:
     void loadResource(etna::OneShotCmdMgr& cmd_mgr, const char* name);
 
     void render(
-    vk::CommandBuffer cmd_buf, vk::Image target_image, vk::ImageView target_image_view, size_t constants_size, void* constants);
+    vk::CommandBuffer cmd_buf, vk::Image target_image, vk::ImageView target_image_view, uint32_t constants_size, void* constants);
 
     void update(glm::vec3 cam_view);
 

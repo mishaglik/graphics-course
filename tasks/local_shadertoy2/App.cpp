@@ -145,7 +145,7 @@ void App::drawFrame()
 
     ETNA_CHECK_VK_RESULT(currentCmdBuf.begin(vk::CommandBufferBeginInfo{}));
     {
-      renderer.render(currentCmdBuf, backbuffer, backbufferView, sizeof(frameTime), &frameTime);
+      renderer.render(currentCmdBuf, backbuffer, backbufferView, static_cast<uint32_t>(sizeof(frameTime)), &frameTime);
 
       // At the end of "rendering", we are required to change how the pixels of the
       // swpchain image are laid out in memory to something that is appropriate

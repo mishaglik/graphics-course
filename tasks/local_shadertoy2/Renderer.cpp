@@ -69,7 +69,7 @@ void
 Renderer::render( vk::CommandBuffer cmd_buf, 
              vk::Image target_image, 
              vk::ImageView target_image_view,
-             size_t push_constants_size,
+             uint32_t push_constants_size,
              void* push_constants
              )
 {
@@ -193,7 +193,7 @@ Renderer::loadResource(etna::OneShotCmdMgr& cmd_mgr, const char* name)
       return;
     }
 
-    size_t size = width * height * 4;
+    size_t size = static_cast<std::size_t>(width * height * 4);
 
     auto& ctx = etna::get_context();
     auto buf = ctx.createBuffer({
@@ -221,11 +221,8 @@ Renderer::loadResource(etna::OneShotCmdMgr& cmd_mgr, const char* name)
         etna::set_state(
             cmdBuf,
             img.get(),
-            // We are going to use the texture at the transfer stage...
             vk::PipelineStageFlagBits2::eTransfer,
-            // ...to transfer-read stuff from it...
-            vk::AccessFlagBits2::eTransferRead,
-            // ...and want it to have the appropriate layout.
+            vk::AccessFlagBits2::eTransferWrite,
             vk::ImageLayout::eTransferDstOptimal,
             vk::ImageAspectFlagBits::eColor
         );
@@ -247,9 +244,7 @@ Renderer::loadResource(etna::OneShotCmdMgr& cmd_mgr, const char* name)
             cmdBuf,
             img.get(),
             vk::PipelineStageFlagBits2::eFragmentShader,
-            // ...to transfer-read stuff from it...
             vk::AccessFlagBits2::eShaderRead,
-            // ...and want it to have the appropriate layout.
             vk::ImageLayout::eShaderReadOnlyOptimal,
             vk::ImageAspectFlagBits::eColor
         );

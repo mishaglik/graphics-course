@@ -46,9 +46,9 @@ std::optional<tinygltf::Model> load_model(std::filesystem::path path)
 
   auto ext = path.extension();
   if (ext == ".gltf")
-    success = loader.LoadASCIIFromFile(&model, &error, &warning, path.string());
+    success = loader.LoadASCIIFromFile(&model, &error, &warning, path.generic_string());
   else if (ext == ".glb")
-    success = loader.LoadBinaryFromFile(&model, &error, &warning, path.string());
+    success = loader.LoadBinaryFromFile(&model, &error, &warning, path.generic_string());
   else
   {
     spdlog::error("glTF: Unknown glTF file extension: '{}'. Expected .gltf or .glb.", ext);
@@ -287,6 +287,13 @@ BakeResult do_bakery(tinygltf::Model& model)
 void append_model(tinygltf::Model& model, BakeResult& baked, Path dest)
 {
 
+  for (auto& image: model.images) {
+    if (image.uri.ends_with("jpeg")) {
+      //Fix jpeg filename isn't supported 
+      image.uri.pop_back();
+      image.uri.back() = 'g';
+    }
+  }
 
   std::size_t indicesBytes =  baked.indices.size() * sizeof(uint32_t);
   std::size_t vertexBytes  =  baked.vertices.size() * sizeof(VertexAttrs);

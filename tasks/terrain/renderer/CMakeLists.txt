@@ -4,6 +4,7 @@ add_executable(terrain_renderer
   App.cpp
   Renderer.cpp
   WorldRenderer.cpp
+  Perlin.cpp
 )
 
 target_link_libraries(terrain_renderer
@@ -12,4 +13,10 @@ target_link_libraries(terrain_renderer
 target_add_shaders(terrain_renderer
   shaders/static_mesh.frag
   shaders/static_mesh.vert
+  shaders/quad.vert
+  shaders/perlin.frag
+  shaders/terrain.vert
+  shaders/terrain.frag
+  shaders/terrain.tesc
+  shaders/terrain.tese
 )

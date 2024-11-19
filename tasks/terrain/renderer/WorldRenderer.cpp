@@ -33,6 +33,10 @@ void WorldRenderer::allocateResources(glm::uvec2 swapchain_resolution)
     .name = "instanceMatrices",
   });
   instanceMatricesBuf.map();
+
+  heightmap.initImage({4096, 4096});
+  for (std::size_t i = 0; i < 12; ++i)
+  heightmap.upscale(*ctx.createOneShotCmdMgr());
 }
 
 void WorldRenderer::loadScene(std::filesystem::path path)
@@ -52,9 +56,27 @@ void WorldRenderer::loadShaders()
 {
   etna::create_program(
     "static_mesh_material",
-    {MANY_OBJECTS_RENDERER_SHADERS_ROOT "static_mesh.frag.spv",
-     MANY_OBJECTS_RENDERER_SHADERS_ROOT "static_mesh.vert.spv"});
-  etna::create_program("static_mesh", {MANY_OBJECTS_RENDERER_SHADERS_ROOT "static_mesh.vert.spv"});
+    {TERRAIN_RENDERER_SHADERS_ROOT "static_mesh.frag.spv",
+     TERRAIN_RENDERER_SHADERS_ROOT "static_mesh.vert.spv"}
+  );
+  
+  etna::create_program(
+    "perlin_shader",
+    {TERRAIN_RENDERER_SHADERS_ROOT "quad.vert.spv",
+     TERRAIN_RENDERER_SHADERS_ROOT "perlin.frag.spv"}
+  );
+
+  etna::create_program(
+    "terrain_shader",
+    {TERRAIN_RENDERER_SHADERS_ROOT "terrain.vert.spv",
+     TERRAIN_RENDERER_SHADERS_ROOT "terrain.tesc.spv",
+     TERRAIN_RENDERER_SHADERS_ROOT "terrain.tese.spv",
+     TERRAIN_RENDERER_SHADERS_ROOT "terrain.frag.spv"
+     }
+  )
+  ;
+  etna::create_program("static_mesh", {TERRAIN_RENDERER_SHADERS_ROOT "static_mesh.vert.spv"});
+  spdlog::info("Shaders loaded");
 }
 
 void WorldRenderer::setupPipelines(vk::Format swapchain_format)
@@ -83,6 +105,19 @@ void WorldRenderer::setupPipelines(vk::Format swapchain_format)
         {
           .colorAttachmentFormats = {swapchain_format},
           .depthAttachmentFormat = vk::Format::eD32Sfloat,
+        },
+    });
+
+   terrainPipeline = pipelineManager.createGraphicsPipeline(
+    "terrain_shader",
+    etna::GraphicsPipeline::CreateInfo{
+      .inputAssemblyConfig = {.topology = vk::PrimitiveTopology::ePatchList},
+      .tessellationConfig = {
+        .patchControlPoints = 4,
+      },
+      .fragmentShaderOutput =
+        {
+          .colorAttachmentFormats = {swapchain_format},
         },
     });
 }
@@ -144,11 +179,64 @@ void WorldRenderer::renderScene(
   }
 }
 
+void WorldRenderer::renderTerrain(
+  vk::CommandBuffer cmd_buf, vk::Image target_image, vk::ImageView target_image_view)
+{
+  ETNA_PROFILE_GPU(cmd_buf, renderTerrain);
+  auto& hmap = heightmap.getImage(); 
+
+  etna::RenderTargetState renderTargets(
+    cmd_buf,
+    {{0, 0}, {resolution.x, resolution.y}},
+    {{.image = target_image, .view = target_image_view}},
+    {}
+  );
+
+  auto terrainShader = etna::get_shader_program("terrain_shader");
+
+  cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, terrainPipeline.getVkPipeline());
+
+
+  auto set = etna::create_descriptor_set(
+    terrainShader.getDescriptorLayoutId(0),
+    cmd_buf,
+    {etna::Binding{0, hmap.genBinding(heightmap.getSampler().get(), vk::ImageLayout::eShaderReadOnlyOptimal)}}
+  );
+
+  cmd_buf.bindDescriptorSets(
+    vk::PipelineBindPoint::eGraphics,
+    terrainPipeline.getVkPipelineLayout(),
+    0,
+    {set.getVkSet()},
+    {}
+  );
+
+  const size_t nChunks = 64;
+  const float step = 2.f / nChunks;
+  for (size_t x = 0; x < nChunks; ++x) {
+    for (size_t y = 0; y < nChunks; ++y) {
+        struct {glm::vec2 base, extent; glm::mat4x4 mat; int degree;} pc {{-1.f + x * step, -1.f + y * step}, {step, step}, pushConst2M.projView, 1024};
+
+        cmd_buf.pushConstants(
+              terrainPipeline.getVkPipelineLayout(), 
+              vk::ShaderStageFlagBits::eVertex |
+              vk::ShaderStageFlagBits::eTessellationEvaluation |
+              vk::ShaderStageFlagBits::eTessellationControl,
+              0, 
+              sizeof(pc), &pc
+        );
+
+        cmd_buf.draw(4, 1, 0, 0);
+    }
+  }
+
+}
+
 void WorldRenderer::renderWorld(
   vk::CommandBuffer cmd_buf, vk::Image target_image, vk::ImageView target_image_view)
 {
   ETNA_PROFILE_GPU(cmd_buf, renderWorld);
-
+  renderTerrain(cmd_buf, target_image, target_image_view);
   // draw final scene to screen
   {
     ETNA_PROFILE_GPU(cmd_buf, renderForward);
@@ -156,8 +244,10 @@ void WorldRenderer::renderWorld(
     etna::RenderTargetState renderTargets(
       cmd_buf,
       {{0, 0}, {resolution.x, resolution.y}},
-      {{.image = target_image, .view = target_image_view}},
-      {.image = mainViewDepth.get(), .view = mainViewDepth.getView({})});
+      {{.image = target_image, .view = target_image_view, .loadOp = vk::AttachmentLoadOp::eLoad}},
+      {.image = mainViewDepth.get(), .view = mainViewDepth.getView({})}
+    );
+    
 
     cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, staticMeshPipeline.getVkPipeline());
     renderScene(cmd_buf, worldViewProj, staticMeshPipeline.getVkPipelineLayout());

@@ -28,7 +28,7 @@ void Renderer::initVulkan(std::span<const char*> instance_extensions)
     .applicationVersion = VK_MAKE_VERSION(0, 1, 0),
     .instanceExtensions = instanceExtensions,
     .deviceExtensions = deviceExtensions,
-    .features = vk::PhysicalDeviceFeatures2{.features = {}},
+    .features = vk::PhysicalDeviceFeatures2{.features = {.tessellationShader=1}},
     .physicalDeviceIndexOverride = {},
     .numFramesInFlight = 2,
   });
@@ -55,8 +55,8 @@ void Renderer::initFrameDelivery(vk::UniqueSurfaceKHR a_surface, ResolutionProvi
 
   worldRenderer = std::make_unique<WorldRenderer>();
 
-  worldRenderer->allocateResources(resolution);
   worldRenderer->loadShaders();
+  worldRenderer->allocateResources(resolution);
   worldRenderer->setupPipelines(window->getCurrentFormat());
 }
 
@@ -81,6 +81,11 @@ void Renderer::debugInput(const Keyboard& kb)
       etna::reload_shaders();
       spdlog::info("Successfully reloaded shaders!");
     }
+  }
+
+  if (kb[KeyboardKey::kU] == ButtonState::Falling)
+  {
+    worldRenderer->heightmap.upscale(*etna::get_context().createOneShotCmdMgr());
   }
 }
 

@@ -6,6 +6,7 @@
 #include <etna/GraphicsPipeline.hpp>
 #include <glm/glm.hpp>
 
+#include "Perlin.hpp"
 #include "scene/SceneManager.hpp"
 #include "wsi/Keyboard.hpp"
 
@@ -30,12 +31,18 @@ public:
     vk::CommandBuffer cmd_buf, vk::Image target_image, vk::ImageView target_image_view);
 
 private:
+  void renderTerrain(
+    vk::CommandBuffer cmd_buf, vk::Image target_image, vk::ImageView target_image_view);
+  
   void renderScene(
     vk::CommandBuffer cmd_buf, const glm::mat4x4& glob_tm, vk::PipelineLayout pipeline_layout);
 
   void prepareFrame(const glm::mat4x4& glob_tm);
+public:
+  PerlinGenerator heightmap;
 private:
   std::unique_ptr<SceneManager> sceneMgr;
+
 
   etna::Image mainViewDepth;
   etna::Buffer constants;
@@ -53,6 +60,7 @@ private:
   glm::mat4x4 lightMatrix;
 
   etna::GraphicsPipeline staticMeshPipeline{};
+  etna::GraphicsPipeline terrainPipeline{};
 
   glm::uvec2 resolution;
 

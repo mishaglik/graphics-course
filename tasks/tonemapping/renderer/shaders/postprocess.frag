@@ -11,7 +11,23 @@ layout (location = 0 ) in VS_OUT
 
 layout(binding = 0) uniform sampler2D image;
 
+layout(binding = 1) readonly buffer d_t
+{
+  float p[128];
+} distribution;
+
+
+
+vec3 tonemap(vec3 color)
+{
+  float brightness = clamp(max(color.r, max(color.g, color.b)), 0., 1.);
+  int bIdx = int(floor(127. * brightness));
+  float p = distribution.p[bIdx];
+  return p * color / brightness;
+}
+
 void main(void)
 {
-  out_fragColor = texture(image, surf.texCoord);
+  vec4 color = texture(image, surf.texCoord);
+  out_fragColor = vec4(tonemap(color.rgb), 1);
 }

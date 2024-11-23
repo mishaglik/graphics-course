@@ -41,6 +41,8 @@ private:
     vk::CommandBuffer cmd_buf, vk::Image target_image, vk::ImageView target_image_view);
 
   void prepareFrame(const glm::mat4x4& glob_tm);
+
+  void tonemapEvaluate(vk::CommandBuffer cmd_buf);
 public:
   PerlinGenerator heightmap;
 private:
@@ -50,6 +52,9 @@ private:
   etna::Image mainViewDepth;
   etna::Image backbuffer;
   etna::Buffer constants;
+
+  etna::Buffer histogramBuffer;
+  etna::Buffer distributionBuffer;
 
   etna::Buffer instanceMatricesBuf;
 
@@ -66,6 +71,9 @@ private:
   etna::GraphicsPipeline staticMeshPipeline{};
   etna::GraphicsPipeline terrainPipeline{};
 
+  etna::ComputePipeline histogramPipeline{};
+  etna::ComputePipeline distributionPipeline{};
+
   etna::GraphicsPipeline postprocessPipeline{};
   etna::Sampler defaultSampler;
   glm::uvec2 resolution;
@@ -75,4 +83,6 @@ private:
     std::size_t amount;
   };
   std::vector<std::size_t> nInstances;
+
+  bool useToneMap = true;
 };

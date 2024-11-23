@@ -7,7 +7,7 @@
 #include <glm/ext.hpp>
 
 const std::size_t N_MAX_INSTANCES = 1 << 14;
-
+const vk::Format BACKBUFFER_FORMAT = vk::Format::eB10G11R11UfloatPack32;
 WorldRenderer::WorldRenderer()
   : sceneMgr{std::make_unique<SceneManager>()}
 {
@@ -25,6 +25,19 @@ void WorldRenderer::allocateResources(glm::uvec2 swapchain_resolution)
     .format = vk::Format::eD32Sfloat,
     .imageUsage = vk::ImageUsageFlagBits::eDepthStencilAttachment,
   });
+
+  backbuffer = ctx.createImage(etna::Image::CreateInfo{
+    .extent = vk::Extent3D{resolution.x, resolution.y, 1},
+    .name = "backbuffer h",
+    // .format = vk::Format::eB10G11R11UfloatPack32,
+    .format = BACKBUFFER_FORMAT,
+    .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+  });
+
+    defaultSampler = etna::Sampler({
+        .filter = vk::Filter::eLinear,
+        .name = "perlinSample",
+    });
 
   instanceMatricesBuf = ctx.createBuffer({
     .size = N_MAX_INSTANCES * sizeof(glm::mat4x4),
@@ -73,8 +86,13 @@ void WorldRenderer::loadShaders()
      TONEMAPPING_RENDERER_SHADERS_ROOT "terrain.tese.spv",
      TONEMAPPING_RENDERER_SHADERS_ROOT "terrain.frag.spv"
      }
-  )
-  ;
+  );
+
+  etna::create_program(
+    "postprocess_shader",
+    {TONEMAPPING_RENDERER_SHADERS_ROOT "quad.vert.spv",
+     TONEMAPPING_RENDERER_SHADERS_ROOT "postprocess.frag.spv"}
+  );
   etna::create_program("static_mesh", {TONEMAPPING_RENDERER_SHADERS_ROOT "static_mesh.vert.spv"});
   spdlog::info("Shaders loaded");
 }
@@ -103,7 +121,7 @@ void WorldRenderer::setupPipelines(vk::Format swapchain_format)
         },
       .fragmentShaderOutput =
         {
-          .colorAttachmentFormats = {swapchain_format},
+          .colorAttachmentFormats = {BACKBUFFER_FORMAT},
           .depthAttachmentFormat = vk::Format::eD32Sfloat,
         },
     });
@@ -115,6 +133,15 @@ void WorldRenderer::setupPipelines(vk::Format swapchain_format)
       .tessellationConfig = {
         .patchControlPoints = 4,
       },
+      .fragmentShaderOutput =
+        {
+          .colorAttachmentFormats = {BACKBUFFER_FORMAT},
+        },
+    });
+
+   postprocessPipeline = pipelineManager.createGraphicsPipeline(
+    "postprocess_shader",
+    etna::GraphicsPipeline::CreateInfo{
       .fragmentShaderOutput =
         {
           .colorAttachmentFormats = {swapchain_format},
@@ -179,8 +206,40 @@ void WorldRenderer::renderScene(
   }
 }
 
+void WorldRenderer::renderPostprocess(
+    vk::CommandBuffer cmd_buf, vk::Image target_image, vk::ImageView target_image_view)
+{
+  ETNA_PROFILE_GPU(cmd_buf, renderPostprocess);
+  etna::RenderTargetState renderTargets(
+    cmd_buf,
+    {{0, 0}, {resolution.x, resolution.y}},
+    {{.image = target_image, .view = target_image_view}},
+    {}
+  );
+
+  auto postprocessShader = etna::get_shader_program("postprocess_shader");
+  
+  cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, postprocessPipeline.getVkPipeline());
+
+  auto set = etna::create_descriptor_set(
+    postprocessShader.getDescriptorLayoutId(0),
+    cmd_buf,
+    {etna::Binding{0, backbuffer.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)}}
+  );
+
+  cmd_buf.bindDescriptorSets(
+    vk::PipelineBindPoint::eGraphics,
+    postprocessPipeline.getVkPipelineLayout(),
+    0,
+    {set.getVkSet()},
+    {}
+  );
+
+  cmd_buf.draw(3, 1, 0, 0);
+}
+
 void WorldRenderer::renderTerrain(
-  vk::CommandBuffer cmd_buf, vk::Image target_image, vk::ImageView target_image_view)
+  vk::CommandBuffer cmd_buf)
 {
   ETNA_PROFILE_GPU(cmd_buf, renderTerrain);
   auto& hmap = heightmap.getImage(); 
@@ -188,7 +247,7 @@ void WorldRenderer::renderTerrain(
   etna::RenderTargetState renderTargets(
     cmd_buf,
     {{0, 0}, {resolution.x, resolution.y}},
-    {{.image = target_image, .view = target_image_view}},
+    {{.image = backbuffer.get(), .view = backbuffer.getView({})}},
     {}
   );
 
@@ -236,15 +295,23 @@ void WorldRenderer::renderWorld(
   vk::CommandBuffer cmd_buf, vk::Image target_image, vk::ImageView target_image_view)
 {
   ETNA_PROFILE_GPU(cmd_buf, renderWorld);
-  renderTerrain(cmd_buf, target_image, target_image_view);
-  // draw final scene to screen
+
+  etna::set_state(cmd_buf, 
+    backbuffer.get(), 
+    vk::PipelineStageFlagBits2::eFragmentShader, 
+    {}, 
+    vk::ImageLayout::eColorAttachmentOptimal, 
+    vk::ImageAspectFlagBits::eColor
+  );
+
+  renderTerrain(cmd_buf);
   {
     ETNA_PROFILE_GPU(cmd_buf, renderForward);
 
     etna::RenderTargetState renderTargets(
       cmd_buf,
       {{0, 0}, {resolution.x, resolution.y}},
-      {{.image = target_image, .view = target_image_view, .loadOp = vk::AttachmentLoadOp::eLoad}},
+      {{.image = backbuffer.get(), .view = backbuffer.getView({}), .loadOp = vk::AttachmentLoadOp::eLoad}},
       {.image = mainViewDepth.get(), .view = mainViewDepth.getView({})}
     );
     
@@ -252,6 +319,16 @@ void WorldRenderer::renderWorld(
     cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, staticMeshPipeline.getVkPipeline());
     renderScene(cmd_buf, worldViewProj, staticMeshPipeline.getVkPipelineLayout());
   }
+
+  etna::set_state(cmd_buf, 
+    backbuffer.get(), 
+    vk::PipelineStageFlagBits2::eFragmentShader, 
+    {}, 
+    vk::ImageLayout::eShaderReadOnlyOptimal, 
+    vk::ImageAspectFlagBits::eColor
+  );
+
+  renderPostprocess(cmd_buf, target_image, target_image_view);
 }
 
 static bool IsVisble(const glm::mat2x3 bounds, const glm::mat4x4& transform)

@@ -19,4 +19,5 @@ target_add_shaders(tonemapping_renderer
   shaders/terrain.frag
   shaders/terrain.tesc
   shaders/terrain.tese
+  shaders/postprocess.frag
 )

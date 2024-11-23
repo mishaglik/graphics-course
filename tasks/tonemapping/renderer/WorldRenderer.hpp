@@ -32,10 +32,13 @@ public:
 
 private:
   void renderTerrain(
-    vk::CommandBuffer cmd_buf, vk::Image target_image, vk::ImageView target_image_view);
+    vk::CommandBuffer cmd_buf);
   
   void renderScene(
     vk::CommandBuffer cmd_buf, const glm::mat4x4& glob_tm, vk::PipelineLayout pipeline_layout);
+
+  void renderPostprocess(
+    vk::CommandBuffer cmd_buf, vk::Image target_image, vk::ImageView target_image_view);
 
   void prepareFrame(const glm::mat4x4& glob_tm);
 public:
@@ -45,6 +48,7 @@ private:
 
 
   etna::Image mainViewDepth;
+  etna::Image backbuffer;
   etna::Buffer constants;
 
   etna::Buffer instanceMatricesBuf;
@@ -62,6 +66,8 @@ private:
   etna::GraphicsPipeline staticMeshPipeline{};
   etna::GraphicsPipeline terrainPipeline{};
 
+  etna::GraphicsPipeline postprocessPipeline{};
+  etna::Sampler defaultSampler;
   glm::uvec2 resolution;
 
   struct RenderGroup {

@@ -11,6 +11,8 @@ layout (location = 0 ) in VS_OUT
 
 layout(push_constant) uniform params
 {
+  vec3 forward;
+  vec3 up;
   float iTime;
 } pushConstant;
 

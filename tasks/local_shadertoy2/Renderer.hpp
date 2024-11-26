@@ -20,6 +20,7 @@ public:
     void render(
     vk::CommandBuffer cmd_buf, vk::Image target_image, vk::ImageView target_image_view, uint32_t constants_size, void* constants);
 
+    void update(glm::vec3 cam_view) { camView =  cam_view; }
 private:
     std::vector<etna::Image> textures;
     etna::Sampler defaultSampler;
@@ -34,4 +35,5 @@ private:
     void initView();
 
     glm::uvec2 resolution;
+    glm::vec3 camView;
 };

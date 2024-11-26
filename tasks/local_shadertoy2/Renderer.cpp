@@ -77,9 +77,9 @@ Renderer::render( vk::CommandBuffer cmd_buf,
     {
         etna::set_state(cmd_buf, 
             skybox.get(), 
-            vk::PipelineStageFlagBits2::eFragmentShader, 
-            {}, 
-            vk::ImageLayout::eGeneral, 
+            vk::PipelineStageFlagBits2::eColorAttachmentOutput, 
+            vk::AccessFlagBits2::eColorAttachmentWrite, 
+            vk::ImageLayout::eColorAttachmentOptimal, 
             vk::ImageAspectFlagBits::eColor
         );
         etna::flush_barriers(cmd_buf);
@@ -95,7 +95,7 @@ Renderer::render( vk::CommandBuffer cmd_buf,
                 etna::Binding{1, textures[1].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
                 etna::Binding{2, textures[2].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
             });
-        
+        etna::flush_barriers(cmd_buf);
         for (uint32_t i = 0; i < 6; ++ i) {
             etna::RenderTargetState renderTargets(
                 cmd_buf,
@@ -117,11 +117,18 @@ Renderer::render( vk::CommandBuffer cmd_buf,
                 {set.getVkSet()},
                 {});
 
-            //TODO: Push layer id to shader
             cmd_buf.pushConstants(
                 skyboxPipeline.getVkPipelineLayout(), vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eVertex, 0, push_constants_size, push_constants);
-            cmd_buf.draw(3, 1, 0, 0);       
+            cmd_buf.draw(3, 1, 0, i);       
         }
+        etna::set_state(cmd_buf, 
+            skybox.get(), 
+            vk::PipelineStageFlagBits2::eFragmentShader, 
+            vk::AccessFlagBits2::eShaderSampledRead, 
+            vk::ImageLayout::eShaderReadOnlyOptimal, 
+            vk::ImageAspectFlagBits::eColor
+        );
+        etna::flush_barriers(cmd_buf);
     }
 
     
@@ -147,7 +154,7 @@ Renderer::render( vk::CommandBuffer cmd_buf,
                                 .layerCount = 6, 
                                 .type = vk::ImageViewType::eCube, 
                             }),
-                            vk::ImageLayout::eGeneral
+                            vk::ImageLayout::eShaderReadOnlyOptimal
                         }
                     }
                 },
@@ -156,6 +163,7 @@ Renderer::render( vk::CommandBuffer cmd_buf,
                 etna::Binding{2, textures[4].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
                 etna::Binding{3, textures[2].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
             });
+            etna::flush_barriers(cmd_buf);
 
 
         etna::RenderTargetState renderTargets(

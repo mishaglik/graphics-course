@@ -14,6 +14,8 @@ layout (location = 0 ) in VS_OUT
 
 layout(push_constant) uniform params
 {
+  vec3 forward;
+  vec3 up;
   float iTime;
 } pushConstant;
 
@@ -221,7 +223,11 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
 
     vec2 scale = 9.0 * resultImageSize.xy / max ( resultImageSize.x, resultImageSize.y ) ;
     vec2 uv    = scale * ( fragCoord / resultImageSize.xy - vec2 ( 0.5 ) );
-    vec3 dir   = normalize ( vec3 ( uv, 0 ) - meye );
+    vec3 dir   = normalize(pushConstant.forward);
+    vec3 up    = normalize(pushConstant.up);
+    vec3 along = cross(up, dir);
+    dir += up * uv.y + along * uv.x;
+    dir = normalize(dir);
     vec4 color = vec4 ( 0, 0, 0, 1 );
     vec4 surf  = vec4 ( 1, 1, 1, 1 );
     vec3 p     = trace ( meye, dir, hit, m, surf);

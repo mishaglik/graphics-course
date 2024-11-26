@@ -102,6 +102,7 @@ App::App()
   renderer.loadResource(*oneShotManager, RESOURCE_DIR "textures/shadertoyTex2.jpg");
   renderer.loadResource(*oneShotManager, RESOURCE_DIR "textures/shadertoyTex3.jpg");
   renderer.loadResource(*oneShotManager, RESOURCE_DIR "textures/shadertoyTex4.png");
+  cam.lookAt({0., 0., -10.}, {0., 0., 0.}, {0., 1., 0.});
 }
 
 App::~App()
@@ -114,7 +115,7 @@ void App::run()
   while (!osWindow->isBeingClosed())
   {
     windowing.poll();
-
+    processInput();
     drawFrame();
   }
 
@@ -145,7 +146,8 @@ void App::drawFrame()
 
     ETNA_CHECK_VK_RESULT(currentCmdBuf.begin(vk::CommandBufferBeginInfo{}));
     {
-      renderer.render(currentCmdBuf, backbuffer, backbufferView, static_cast<uint32_t>(sizeof(frameTime)), &frameTime);
+      struct {glm::vec3 forward; glm::vec3 up alignas(16); float frameTime; } pc{cam.forward(), cam.up(), frameTime};
+      renderer.render(currentCmdBuf, backbuffer, backbufferView, static_cast<uint32_t>(sizeof(pc)), &pc);
 
       // At the end of "rendering", we are required to change how the pixels of the
       // swpchain image are laid out in memory to something that is appropriate
@@ -188,4 +190,27 @@ void App::drawFrame()
     });
     ETNA_VERIFY((resolution == glm::uvec2{w, h}));
   }
+}
+
+void App::rotateCam(const Mouse& ms) {
+  cam.rotate(ms.capturedPosDelta.y, ms.capturedPosDelta.x);
+  // // Increase or decrease field of view based on mouse wheel
+  // cam.fov -= ms.scrollDelta.y;
+  // if (cam.fov < 1.0f)
+  //   cam.fov = 1.0f;
+  // if (cam.fov > 120.0f)
+  //   cam.fov = 120.0f;
+}
+
+void 
+App::processInput() 
+{
+  if (osWindow->mouse[MouseButton::mbRight] == ButtonState::Rising)
+    osWindow->captureMouse = !osWindow->captureMouse;
+
+  if (osWindow->captureMouse) {
+    rotateCam(osWindow->mouse);
+  }
+
+  renderer.update(cam.forward());
 }

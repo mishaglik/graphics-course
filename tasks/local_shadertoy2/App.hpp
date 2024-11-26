@@ -14,7 +14,7 @@
 
 // May gods help us using this lib
 #include <chrono>
-
+#include <scene/Camera.hpp>
 class App
 {
 public:
@@ -25,6 +25,8 @@ public:
 
 private:
   void drawFrame();
+  void rotateCam(const Mouse& ms);
+  void processInput();
 
 private:
   Renderer renderer;
@@ -40,4 +42,5 @@ private:
 
   std::chrono::high_resolution_clock::time_point timeStart;
 
+  Camera cam;
 };

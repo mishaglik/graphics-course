@@ -3,6 +3,8 @@
 
 layout(push_constant) uniform params
 {
+  vec3 forward;
+  vec3 up;
   float iTime;
 } pushConstant;
 

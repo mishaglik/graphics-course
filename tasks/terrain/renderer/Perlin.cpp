@@ -43,21 +43,6 @@ void PerlinGenerator::upscale(etna::OneShotCmdMgr& cmd_mgr)
 
     ETNA_CHECK_VK_RESULT(cmdBuf.begin(vk::CommandBufferBeginInfo{}));
     {
-        etna::set_state(cmdBuf, 
-            inImage.get(), 
-            vk::PipelineStageFlagBits2::eFragmentShader, 
-            {}, 
-            vk::ImageLayout::eShaderReadOnlyOptimal, 
-            vk::ImageAspectFlagBits::eColor
-        );
-        etna::set_state(cmdBuf, 
-            outImage.get(), 
-            vk::PipelineStageFlagBits2::eFragmentShader, 
-            {}, 
-            vk::ImageLayout::eGeneral, 
-            vk::ImageAspectFlagBits::eColor
-        );
-        etna::flush_barriers(cmdBuf);
 
         auto shader = etna::get_shader_program("perlin_shader");
         auto set = etna::create_descriptor_set(shader.getDescriptorLayoutId(0),
@@ -65,6 +50,37 @@ void PerlinGenerator::upscale(etna::OneShotCmdMgr& cmd_mgr)
                 etna::Binding(0, inImage.genBinding(m_sampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal))
             }
         );
+
+        if (m_frequency == 1)
+        {
+            etna::set_state(cmdBuf, 
+                inImage.get(), 
+                vk::PipelineStageFlagBits2::eTopOfPipe, 
+                {}, 
+                vk::ImageLayout::eGeneral, 
+                vk::ImageAspectFlagBits::eColor
+            );
+            etna::flush_barriers(cmdBuf);
+        }
+
+        etna::set_state(cmdBuf, 
+            outImage.get(), 
+            vk::PipelineStageFlagBits2::eColorAttachmentOutput, 
+            {}, 
+            vk::ImageLayout::eColorAttachmentOptimal, 
+            vk::ImageAspectFlagBits::eColor
+        );
+
+        etna::set_state(cmdBuf, 
+            inImage.get(), 
+            vk::PipelineStageFlagBits2::eFragmentShader, 
+            vk::AccessFlagBits2::eShaderSampledRead, 
+            vk::ImageLayout::eShaderReadOnlyOptimal, 
+            vk::ImageAspectFlagBits::eColor
+        );
+        etna::flush_barriers(cmdBuf);
+      
+
         etna::RenderTargetState renderTargets(
             cmdBuf,
             {{0, 0}, m_extent},
@@ -74,7 +90,6 @@ void PerlinGenerator::upscale(etna::OneShotCmdMgr& cmd_mgr)
             }},
             {}
         );
-
     
         cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, m_pipeline.getVkPipeline());
         cmdBuf.bindDescriptorSets(
@@ -88,15 +103,11 @@ void PerlinGenerator::upscale(etna::OneShotCmdMgr& cmd_mgr)
         struct {float amplitude; unsigned frequency;} pParams{0.5f / m_frequency, m_frequency};
         cmdBuf.pushConstants(m_pipeline.getVkPipelineLayout(), vk::ShaderStageFlagBits::eFragment, 0, sizeof(pParams), &pParams);
         cmdBuf.draw(3, 1, 0, 0);
-        etna::set_state(cmdBuf, 
-            outImage.get(), 
-            vk::PipelineStageFlagBits2::eAllCommands, 
-            {}, 
-            vk::ImageLayout::eShaderReadOnlyOptimal, 
-            vk::ImageAspectFlagBits::eColor
-        );
-    }
+    }   
+    etna::set_state(cmdBuf, outImage.get(), vk::PipelineStageFlagBits2::eBottomOfPipe, {}, vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageAspectFlagBits::eColor);
+    etna::flush_barriers(cmdBuf);
     ETNA_CHECK_VK_RESULT(cmdBuf.end());
+
     cmd_mgr.submitAndWait(std::move(cmdBuf));
     
     m_frequency *= 2;

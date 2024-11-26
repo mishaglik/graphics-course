@@ -36,7 +36,7 @@ void WorldRenderer::allocateResources(glm::uvec2 swapchain_resolution)
 
   heightmap.initImage({4096, 4096});
   for (std::size_t i = 0; i < 12; ++i)
-  heightmap.upscale(*ctx.createOneShotCmdMgr());
+    heightmap.upscale(*ctx.createOneShotCmdMgr());
 }
 
 void WorldRenderer::loadScene(std::filesystem::path path)
@@ -207,6 +207,7 @@ void WorldRenderer::renderTerrain(
 {
   ETNA_PROFILE_GPU(cmd_buf, renderTerrain);
   auto& hmap = heightmap.getImage(); 
+
   etna::RenderTargetState renderTargets(
     cmd_buf,
     {{0, 0}, {resolution.x, resolution.y}},

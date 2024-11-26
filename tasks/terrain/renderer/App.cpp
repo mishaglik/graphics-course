@@ -103,6 +103,7 @@ void App::moveCam(Camera& cam, const Keyboard& kb, float dt)
   // NOTE: This is how you make moving diagonally not be faster than
   // in a straight line.
   cam.move(dt * camMoveSpeed * (length(dir) > 1e-9 ? normalize(dir) : dir));
+  renderer->updateCamPos(cam.position);
 }
 
 void App::rotateCam(Camera& cam, const Mouse& ms, float /*dt*/)

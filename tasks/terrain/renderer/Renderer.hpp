@@ -28,6 +28,8 @@ public:
   void update(const FramePacket& packet);
   void drawFrame();
 
+  void updateCamPos(glm::vec3 pos) { worldRenderer->updateCamPos(pos); }
+
 private:
   ResolutionProvider resolutionProvider;
 

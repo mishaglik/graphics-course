@@ -43,7 +43,6 @@ void PerlinGenerator::upscale(etna::OneShotCmdMgr& cmd_mgr)
 
     ETNA_CHECK_VK_RESULT(cmdBuf.begin(vk::CommandBufferBeginInfo{}));
     {
-        etna::flush_barriers(cmdBuf);
         etna::set_state(cmdBuf, 
             inImage.get(), 
             vk::PipelineStageFlagBits2::eFragmentShader, 

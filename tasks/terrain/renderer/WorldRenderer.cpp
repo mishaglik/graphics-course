@@ -112,7 +112,7 @@ void WorldRenderer::setupPipelines(vk::Format swapchain_format)
     "terrain_shader",
     etna::GraphicsPipeline::CreateInfo{
       .inputAssemblyConfig = {.topology = vk::PrimitiveTopology::ePatchList},
-      .tessellationConfig = {
+      .tessellationConfig = { 
         .patchControlPoints = 4,
       },
       .fragmentShaderOutput =
@@ -120,9 +120,32 @@ void WorldRenderer::setupPipelines(vk::Format swapchain_format)
           .colorAttachmentFormats = {swapchain_format},
         },
     });
+
+    terrainDebugPipeline = pipelineManager.createGraphicsPipeline(
+    "terrain_shader",
+    etna::GraphicsPipeline::CreateInfo{
+      .inputAssemblyConfig = {.topology = vk::PrimitiveTopology::ePatchList},
+      .tessellationConfig = { 
+        .patchControlPoints = 4,
+      },
+      .rasterizationConfig = {
+        .polygonMode = vk::PolygonMode::eLine,
+        .lineWidth = 1.f,
+      },
+      .fragmentShaderOutput =
+        {
+          .colorAttachmentFormats = {swapchain_format},
+        },
+    });
+    
 }
 
-void WorldRenderer::debugInput(const Keyboard&) {}
+void WorldRenderer::debugInput(const Keyboard& kb) 
+{
+  if (kb[KeyboardKey::kF3] == ButtonState::Falling) {
+    wireframe = !wireframe;
+  }
+}
 
 void WorldRenderer::update(const FramePacket& packet)
 {
@@ -184,7 +207,6 @@ void WorldRenderer::renderTerrain(
 {
   ETNA_PROFILE_GPU(cmd_buf, renderTerrain);
   auto& hmap = heightmap.getImage(); 
-
   etna::RenderTargetState renderTargets(
     cmd_buf,
     {{0, 0}, {resolution.x, resolution.y}},
@@ -193,9 +215,9 @@ void WorldRenderer::renderTerrain(
   );
 
   auto terrainShader = etna::get_shader_program("terrain_shader");
+  auto& pipeline = wireframe ? terrainDebugPipeline : terrainPipeline;
 
-  cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, terrainPipeline.getVkPipeline());
-
+  cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.getVkPipeline());
 
   auto set = etna::create_descriptor_set(
     terrainShader.getDescriptorLayoutId(0),
@@ -205,25 +227,29 @@ void WorldRenderer::renderTerrain(
 
   cmd_buf.bindDescriptorSets(
     vk::PipelineBindPoint::eGraphics,
-    terrainPipeline.getVkPipelineLayout(),
+    pipeline.getVkPipelineLayout(),
     0,
     {set.getVkSet()},
     {}
   );
 
-  const size_t nChunks = 64;
+  const size_t nChunks = 16;
   const float step = 2.f / nChunks;
   for (size_t x = 0; x < nChunks; ++x) {
     for (size_t y = 0; y < nChunks; ++y) {
-        struct {glm::vec2 base, extent; glm::mat4x4 mat; int degree;} pc {{-1.f + x * step, -1.f + y * step}, {step, step}, pushConst2M.projView, 1024};
+        pushConstantsTerrain.base = {-1.f + x * step, -1.f + y * step};
+        pushConstantsTerrain.extent = {step, step};
+        pushConstantsTerrain.mat  = pushConst2M.projView;
+        pushConstantsTerrain.camPos = camPos;
+        pushConstantsTerrain.degree = 1024;
 
         cmd_buf.pushConstants(
-              terrainPipeline.getVkPipelineLayout(), 
+              pipeline.getVkPipelineLayout(), 
               vk::ShaderStageFlagBits::eVertex |
               vk::ShaderStageFlagBits::eTessellationEvaluation |
               vk::ShaderStageFlagBits::eTessellationControl,
               0, 
-              sizeof(pc), &pc
+              sizeof(pushConstantsTerrain), &pushConstantsTerrain
         );
 
         cmd_buf.draw(4, 1, 0, 0);

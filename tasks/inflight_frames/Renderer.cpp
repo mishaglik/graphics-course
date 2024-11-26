@@ -91,9 +91,9 @@ Renderer::render( vk::CommandBuffer cmd_buf,
 
         etna::set_state(cmd_buf, 
             skybox.get(), 
-            vk::PipelineStageFlagBits2::eFragmentShader, 
-            {}, 
-            vk::ImageLayout::eGeneral, 
+            vk::PipelineStageFlagBits2::eColorAttachmentOutput, 
+            vk::AccessFlagBits2::eColorAttachmentWrite, 
+            vk::ImageLayout::eColorAttachmentOptimal, 
             vk::ImageAspectFlagBits::eColor
         );
         etna::flush_barriers(cmd_buf);
@@ -140,6 +140,14 @@ Renderer::render( vk::CommandBuffer cmd_buf,
         }
     }
 
+    etna::set_state(cmd_buf, 
+        skybox.get(), 
+        vk::PipelineStageFlagBits2::eFragmentShader, 
+        vk::AccessFlagBits2::eShaderSampledRead, 
+        vk::ImageLayout::eShaderReadOnlyOptimal, 
+        vk::ImageAspectFlagBits::eColor
+    );
+    etna::flush_barriers(cmd_buf);
     
 
     // main image render
@@ -165,7 +173,7 @@ Renderer::render( vk::CommandBuffer cmd_buf,
                                 .layerCount = 6, 
                                 .type = vk::ImageViewType::eCube, 
                             }),
-                            vk::ImageLayout::eGeneral
+                            vk::ImageLayout::eShaderReadOnlyOptimal
                         }
                     }
                 },

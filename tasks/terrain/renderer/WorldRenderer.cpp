@@ -118,6 +118,7 @@ void WorldRenderer::setupPipelines(vk::Format swapchain_format)
       .fragmentShaderOutput =
         {
           .colorAttachmentFormats = {swapchain_format},
+          .depthAttachmentFormat = vk::Format::eD32Sfloat,
         },
     });
 
@@ -135,6 +136,7 @@ void WorldRenderer::setupPipelines(vk::Format swapchain_format)
       .fragmentShaderOutput =
         {
           .colorAttachmentFormats = {swapchain_format},
+          .depthAttachmentFormat = vk::Format::eD32Sfloat,
         },
     });
     
@@ -212,7 +214,7 @@ void WorldRenderer::renderTerrain(
     cmd_buf,
     {{0, 0}, {resolution.x, resolution.y}},
     {{.image = target_image, .view = target_image_view}},
-    {}
+    {.image = mainViewDepth.get(), .view = mainViewDepth.getView({})}
   );
 
   auto terrainShader = etna::get_shader_program("terrain_shader");
@@ -272,7 +274,7 @@ void WorldRenderer::renderWorld(
       cmd_buf,
       {{0, 0}, {resolution.x, resolution.y}},
       {{.image = target_image, .view = target_image_view, .loadOp = vk::AttachmentLoadOp::eLoad}},
-      {.image = mainViewDepth.get(), .view = mainViewDepth.getView({})}
+      {.image = mainViewDepth.get(), .view = mainViewDepth.getView({}), .loadOp=vk::AttachmentLoadOp::eLoad}
     );
     
 

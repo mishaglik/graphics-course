@@ -30,6 +30,9 @@ public:
   void renderWorld(
     vk::CommandBuffer cmd_buf, vk::Image target_image, vk::ImageView target_image_view);
 
+  void updateCamPos(glm::vec3 pos) { 
+    camPos = pos; 
+  }
 private:
   void renderTerrain(
     vk::CommandBuffer cmd_buf, vk::Image target_image, vk::ImageView target_image_view);
@@ -56,13 +59,22 @@ private:
     glm::uint  instIdx;
   } pushConst2M;
 
+  struct TerrainPushContants
+    glm::mat4x4 mat; 
+    glm::vec3 camPos;
+    int degree;
+  } pushConstantsTerrain;
+
   glm::mat4x4 worldViewProj;
   glm::mat4x4 lightMatrix;
-
   etna::GraphicsPipeline staticMeshPipeline{};
   etna::GraphicsPipeline terrainPipeline{};
+  etna::GraphicsPipeline terrainDebugPipeline{};
+
+  bool wireframe = false;
 
   glm::uvec2 resolution;
+  glm::vec3 camPos;
 
   struct RenderGroup {
     RenderElement re;

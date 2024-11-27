@@ -36,7 +36,7 @@ void WorldRenderer::allocateResources(glm::uvec2 swapchain_resolution)
 
   heightmap.initImage({4096, 4096});
   for (std::size_t i = 0; i < 12; ++i)
-  heightmap.upscale(*ctx.createOneShotCmdMgr());
+    heightmap.upscale(*ctx.createOneShotCmdMgr());
 }
 
 void WorldRenderer::loadScene(std::filesystem::path path)
@@ -112,17 +112,42 @@ void WorldRenderer::setupPipelines(vk::Format swapchain_format)
     "terrain_shader",
     etna::GraphicsPipeline::CreateInfo{
       .inputAssemblyConfig = {.topology = vk::PrimitiveTopology::ePatchList},
-      .tessellationConfig = {
+      .tessellationConfig = { 
         .patchControlPoints = 4,
       },
       .fragmentShaderOutput =
         {
           .colorAttachmentFormats = {swapchain_format},
+          .depthAttachmentFormat = vk::Format::eD32Sfloat,
         },
     });
+
+    terrainDebugPipeline = pipelineManager.createGraphicsPipeline(
+    "terrain_shader",
+    etna::GraphicsPipeline::CreateInfo{
+      .inputAssemblyConfig = {.topology = vk::PrimitiveTopology::ePatchList},
+      .tessellationConfig = { 
+        .patchControlPoints = 4,
+      },
+      .rasterizationConfig = {
+        .polygonMode = vk::PolygonMode::eLine,
+        .lineWidth = 1.f,
+      },
+      .fragmentShaderOutput =
+        {
+          .colorAttachmentFormats = {swapchain_format},
+          .depthAttachmentFormat = vk::Format::eD32Sfloat,
+        },
+    });
+    
 }
 
-void WorldRenderer::debugInput(const Keyboard&) {}
+void WorldRenderer::debugInput(const Keyboard& kb) 
+{
+  if (kb[KeyboardKey::kF3] == ButtonState::Falling) {
+    wireframe = !wireframe;
+  }
+}
 
 void WorldRenderer::update(const FramePacket& packet)
 {
@@ -189,13 +214,13 @@ void WorldRenderer::renderTerrain(
     cmd_buf,
     {{0, 0}, {resolution.x, resolution.y}},
     {{.image = target_image, .view = target_image_view}},
-    {}
+    {.image = mainViewDepth.get(), .view = mainViewDepth.getView({})}
   );
 
   auto terrainShader = etna::get_shader_program("terrain_shader");
+  auto& pipeline = wireframe ? terrainDebugPipeline : terrainPipeline;
 
-  cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, terrainPipeline.getVkPipeline());
-
+  cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.getVkPipeline());
 
   auto set = etna::create_descriptor_set(
     terrainShader.getDescriptorLayoutId(0),
@@ -205,25 +230,29 @@ void WorldRenderer::renderTerrain(
 
   cmd_buf.bindDescriptorSets(
     vk::PipelineBindPoint::eGraphics,
-    terrainPipeline.getVkPipelineLayout(),
+    pipeline.getVkPipelineLayout(),
     0,
     {set.getVkSet()},
     {}
   );
 
+<<<<<<< HEAD
   const size_t nChunks = 64;
   const float step = 2.f / nChunks;
   for (size_t x = 0; x < nChunks; ++x) {
-    for (size_t y = 0; y < nChunks; ++y) {
-        struct {glm::vec2 base, extent; glm::mat4x4 mat; int degree;} pc {{-1.f + x * step, -1.f + y * step}, {step, step}, pushConst2M.projView, 1024};
+        pushConstantsTerrain.base = {-1.f + x * step, -1.f + y * step};
+        pushConstantsTerrain.extent = {step, step};
+        pushConstantsTerrain.mat  = pushConst2M.projView;
+        pushConstantsTerrain.camPos = camPos;
+        pushConstantsTerrain.degree = 1024;
 
         cmd_buf.pushConstants(
-              terrainPipeline.getVkPipelineLayout(), 
+              pipeline.getVkPipelineLayout(), 
+>>>>>>> terrain
               vk::ShaderStageFlagBits::eVertex |
               vk::ShaderStageFlagBits::eTessellationEvaluation |
               vk::ShaderStageFlagBits::eTessellationControl,
-              0, 
-              sizeof(pc), &pc
+              sizeof(pushConstantsTerrain), &pushConstantsTerrain
         );
 
         cmd_buf.draw(4, 1, 0, 0);
@@ -245,7 +274,7 @@ void WorldRenderer::renderWorld(
       cmd_buf,
       {{0, 0}, {resolution.x, resolution.y}},
       {{.image = target_image, .view = target_image_view, .loadOp = vk::AttachmentLoadOp::eLoad}},
-      {.image = mainViewDepth.get(), .view = mainViewDepth.getView({})}
+      {.image = mainViewDepth.get(), .view = mainViewDepth.getView({}), .loadOp=vk::AttachmentLoadOp::eLoad}
     );
     
 

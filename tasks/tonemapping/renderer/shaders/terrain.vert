@@ -11,6 +11,7 @@ layout(push_constant) uniform params_t
   vec2 base; 
   vec2 extent;
   mat4 mProjView;
+  vec3 camPos;
   int degree;
 } params;
 

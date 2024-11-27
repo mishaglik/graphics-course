@@ -29,7 +29,6 @@ public:
   void drawGui();
   void renderWorld(
     vk::CommandBuffer cmd_buf, vk::Image target_image, vk::ImageView target_image_view);
-
 private:
   void renderTerrain(
     vk::CommandBuffer cmd_buf);
@@ -65,11 +64,19 @@ private:
     glm::uint  instIdx;
   } pushConst2M;
 
+   struct TerrainPushContants {
+    glm::vec2 base, extent;
+    glm::mat4x4 mat; 
+    glm::vec3 camPos;
+    int degree;
+  } pushConstantsTerrain;
+
   glm::mat4x4 worldViewProj;
   glm::mat4x4 lightMatrix;
 
   etna::GraphicsPipeline staticMeshPipeline{};
   etna::GraphicsPipeline terrainPipeline{};
+  etna::GraphicsPipeline terrainDebugPipeline{};
 
   etna::ComputePipeline histogramPipeline{};
   etna::ComputePipeline distributionPipeline{};
@@ -85,4 +92,5 @@ private:
   std::vector<std::size_t> nInstances;
 
   bool useToneMap = true;
+  bool wireframe = false;
 };

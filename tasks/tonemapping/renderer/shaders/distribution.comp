@@ -24,6 +24,6 @@ void main() {
             pref += histogram_in.bucket[i];
     }
     histogram_out.distribution[gl_GlobalInvocationID.x] = float(pref) / float(total);
-    barrier();
+    memoryBarrierBuffer();
     histogram_in.bucket[gl_GlobalInvocationID.x] = 0;
 }

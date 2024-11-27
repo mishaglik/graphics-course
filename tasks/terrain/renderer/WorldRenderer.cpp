@@ -236,29 +236,27 @@ void WorldRenderer::renderTerrain(
     {}
   );
 
-<<<<<<< HEAD
   const size_t nChunks = 64;
   const float step = 2.f / nChunks;
   for (size_t x = 0; x < nChunks; ++x) {
-        pushConstantsTerrain.base = {-1.f + x * step, -1.f + y * step};
-        pushConstantsTerrain.extent = {step, step};
-        pushConstantsTerrain.mat  = pushConst2M.projView;
-        pushConstantsTerrain.camPos = camPos;
-        pushConstantsTerrain.degree = 1024;
+    for (size_t y = 0; y < nChunks; ++y) {
+      pushConstantsTerrain.base = {-1.f + x * step, -1.f + y * step};
+      pushConstantsTerrain.extent = {step, step};
+      pushConstantsTerrain.mat  = pushConst2M.projView;
+      pushConstantsTerrain.camPos = camPos;
+      pushConstantsTerrain.degree = 1024;
 
-        cmd_buf.pushConstants(
-              pipeline.getVkPipelineLayout(), 
->>>>>>> terrain
-              vk::ShaderStageFlagBits::eVertex |
-              vk::ShaderStageFlagBits::eTessellationEvaluation |
-              vk::ShaderStageFlagBits::eTessellationControl,
-              sizeof(pushConstantsTerrain), &pushConstantsTerrain
-        );
-
-        cmd_buf.draw(4, 1, 0, 0);
+      cmd_buf.pushConstants(
+            pipeline.getVkPipelineLayout(), 
+            vk::ShaderStageFlagBits::eVertex |
+            vk::ShaderStageFlagBits::eTessellationEvaluation |
+            vk::ShaderStageFlagBits::eTessellationControl,
+            0,
+            sizeof(pushConstantsTerrain), &pushConstantsTerrain
+      );
+      cmd_buf.draw(4, 1, 0, 0);
     }
   }
-
 }
 
 void WorldRenderer::renderWorld(

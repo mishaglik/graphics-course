@@ -59,7 +59,8 @@ private:
     glm::uint  instIdx;
   } pushConst2M;
 
-  struct TerrainPushContants
+  struct TerrainPushContants {
+    glm::vec2 base, extent;
     glm::mat4x4 mat; 
     glm::vec3 camPos;
     int degree;

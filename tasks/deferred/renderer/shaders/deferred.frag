@@ -12,10 +12,20 @@ layout (location = 0 ) in VS_OUT
 layout(binding = 0) uniform sampler2D albedo;
 layout(binding = 1) uniform sampler2D normal;
 layout(binding = 2) uniform sampler2D  depth;
+layout(std140, binding = 3) readonly buffer lp_t
+{
+  vec4 position[];
+} lightPos;
+
+layout(std140, binding = 4) readonly buffer lc_t
+{
+  vec4 color[];
+} lightCol;
 
 layout(push_constant) uniform pc_t
 {
     mat4 mProjView;
+    int nLights;
 } params;
 
 const vec2 resolution = vec2(1280, 720);
@@ -28,9 +38,8 @@ vec3 getPos(float depth, float wc) {
   ) / wc;
 }
 
-vec4 getLight(vec3 lightPos, vec3 pos, vec3 normal)
+vec4 getLight(vec3 lightPos, vec3 pos, vec3 normal, vec3 lightColor)
 {
-  const vec3 lightColor = vec3(1.0f, 1.0f, 1.0f);
   const vec3 lightDir   = normalize(lightPos - pos);
   const vec3 diffuse = max(dot(normal, lightDir), 0.0f) * lightColor;
   const float ambient = 0.05;
@@ -39,7 +48,6 @@ vec4 getLight(vec3 lightPos, vec3 pos, vec3 normal)
 
 void main(void)
 {
-  const vec3 wLightPos = (params.mProjView * vec4(0, 2, 0, 1)).rgb;
   const vec3 surfaceColor = texture(albedo, surf.texCoord).rgb;
 
 
@@ -49,8 +57,18 @@ void main(void)
   const float wc    = normal_wc.w;
   const float depthV = texture(depth, surf.texCoord).w;
   const vec3 pos = getPos(depthV, wc);
-
-  out_fragColor = getLight(wLightPos, pos, normal);
+  
+  //first light is sun
+  out_fragColor = getLight((params.mProjView * vec4(lightPos.position[0].xyz, 1)).xyz, pos, normal, lightCol.color[0].rgb);
+  
+  for(int i = 1; i < params.nLights; ++i) {
+    vec4 lightPosRange = lightPos.position[i];
+    const vec3 wLightPos = (params.mProjView * vec4(lightPosRange.xyz, 1)).rgb;
+  
+    if(length(transpose(ipv3) * (wLightPos - pos)) < lightPosRange.w) {
+      out_fragColor += getLight(wLightPos.xyz, pos, normal, lightCol.color[i].rgb);
+    }
+  }
   out_fragColor.rgb *= surfaceColor;
 
   gl_FragDepth = depthV;

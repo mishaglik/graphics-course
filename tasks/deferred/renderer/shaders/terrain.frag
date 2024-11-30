@@ -19,10 +19,23 @@ float depthToDist(float depth)
   return depth / gl_FragCoord.w;
 }
 
+vec3 heightColor(float height)
+{
+  if(height > 25)
+    return vec3(0.9, 0.9, 0.91);
+  if(height < 8.01)
+    return vec3(0.01, 0.01, 0.71);
+  if(height < 8.1)
+    return vec3(0.81, 0.83, 0.23);
+
+  return vec3(0.08, 0.31, 0.09);
+}
+
 void main(void)
 {
-  out_fragColor = fract(surf.texCoord.x * 64.) < 0.5 ? vec4(1., 0., 0., 0) : vec4(0., 1., 0., 0);
+  //out_fragColor = fract(surf.texCoord.x * 64.) < 0.5 ? vec4(1., 0., 0., 0) : vec4(0., 1., 0., 0);
   //out_fragColor = vec4(gl_FragCoord.z, depthToDist(gl_FragCoord.z) / far, 1., 0);
+  out_fragColor.rgb = heightColor(surf.height);
 
   out_fragNormal = vec4(surf.normal.rgb, gl_FragCoord.w);
 

@@ -52,8 +52,12 @@ void main()
     vec4 p = (p1 - p0) * v + p0;
 
     float h   = texture(heightMap, t  ).r * 64.0 - 16.0;
+    h = max(h, 8);
+
     float hn0 = texture(heightMap, t + vec2(tstep,    0)).r * 64.0 - 16.0;
     float hn1 = texture(heightMap, t + vec2(   0, tstep)).r * 64.0 - 16.0;
+    hn0 = max(hn0, 8);
+    hn1 = max(hn1, 8);
 
     vec4 pn0 = p + vec4(pstep, 0, 0, 0);
     vec4 pn1 = p + vec4(0, 0, pstep, 0);

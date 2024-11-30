@@ -21,7 +21,7 @@ App::App()
 
   mainCam.lookAt({0, 10, 10}, {0, 0, 0}, {0, 1, 0});
 
-  renderer->loadScene(GRAPHICS_COURSE_RESOURCES_ROOT "/scenes/low_poly_dark_town/scene.gltf");
+  renderer->loadScene(GRAPHICS_COURSE_RESOURCES_ROOT "/scenes/low_poly_dark_town/scene_baked.gltf");
 }
 
 void App::run()
@@ -61,6 +61,9 @@ void App::processInput(float dt)
   moveCam(mainCam, mainWindow->keyboard, dt);
   if (mainWindow->captureMouse)
     rotateCam(mainCam, mainWindow->mouse, dt);
+
+  if(mainWindow->keyboard[KeyboardKey::kP] == ButtonState::Falling)
+    spdlog::info("Current position: {{{}, {}, {}}}", mainCam.position.x, mainCam.position.y, mainCam.position.z);
 
   renderer->debugInput(mainWindow->keyboard);
 }

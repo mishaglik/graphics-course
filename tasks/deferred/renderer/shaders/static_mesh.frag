@@ -34,7 +34,7 @@ vec3 getPos() {
 
 void main()
 {
-  out_fragColor = vec4(1., 1., 1., 0);
+  out_fragColor = vec4(1., 1., 1., 0) * 0.3;
   out_fragNormal.rgb = surf.wNorm;
   out_fragNormal.w = gl_FragCoord.w;
 

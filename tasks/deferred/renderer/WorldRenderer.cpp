@@ -851,10 +851,12 @@ void WorldRenderer::renderLights(vk::CommandBuffer cmd_buf)
       etna::Binding{0, gBuffer[0].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
       etna::Binding{1, gBuffer[1].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
       etna::Binding{2, gBuffer[2].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+      etna::Binding{3, sceneMgr->getLightSourcesPosBuffer().genBinding()},
+      etna::Binding{4, sceneMgr->getLightSourcesColBuffer().genBinding()},
     }
   );
   assert(gBuffer.size() == 3);
-
+  
   cmd_buf.bindDescriptorSets(
     vk::PipelineBindPoint::eGraphics,
     pipeline.getVkPipelineLayout(),
@@ -863,12 +865,14 @@ void WorldRenderer::renderLights(vk::CommandBuffer cmd_buf)
     {}
   );
 
+  struct {glm::mat4x4 pv; int nLights;} pushConstants{worldViewProj, sceneMgr->nLights()};
+
   cmd_buf.pushConstants(
     pipeline.getVkPipelineLayout(), 
     vk::ShaderStageFlagBits::eFragment,
     0,
-    uint32_t(sizeof(glm::mat4x4)),
-    &worldViewProj
+    uint32_t(sizeof(pushConstants)),
+    &pushConstants
   );
 
   cmd_buf.draw(3, 1, 0, 0);

@@ -20,6 +20,7 @@ struct RenderElement
   // Material* material;
 };
 
+
 // A mesh is a collection of relems. A scene may have the same mesh
 // located in several different places, so a scene consists of **instances**,
 // not meshes.
@@ -51,8 +52,14 @@ public:
 
   vk::Buffer getVertexBuffer() { return unifiedVbuf.get(); }
   vk::Buffer getIndexBuffer() { return unifiedIbuf.get(); }
+  
+  etna::Buffer& getLightSourcesPosBuffer() { return unifiedLPbuf; }
+  etna::Buffer& getLightSourcesColBuffer() { return unifiedLCbuf; }
+
 
   etna::VertexByteStreamFormatDescription getVertexFormatDescription();
+
+  int nLights() const { return static_cast<int>(lightSourcesPoses.size()); }
 
 private:
 
@@ -89,6 +96,7 @@ private:
   ProcessedMeshes processMeshesBaked(const tinygltf::Model& model) const;
   void uploadData(std::span<const Vertex> vertices, std::span<const std::uint32_t>);
 
+  void setupLights();
 private:
   tinygltf::TinyGLTF loader;
   std::unique_ptr<etna::OneShotCmdMgr> oneShotCommands;
@@ -102,4 +110,9 @@ private:
 
   etna::Buffer unifiedVbuf;
   etna::Buffer unifiedIbuf;
+  etna::Buffer unifiedLPbuf;
+  etna::Buffer unifiedLCbuf;
+
+  std::vector<glm::vec4> lightSourcesPoses;
+  std::vector<glm::vec4> lightSourcesColors;
 };

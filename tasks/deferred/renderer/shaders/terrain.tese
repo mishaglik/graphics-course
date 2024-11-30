@@ -34,8 +34,6 @@ void main()
     vec2 t10 = TextureCoord[2];
     vec2 t11 = TextureCoord[3];
     
-    float tstep = (t01.y - t00.y) / params.degree; 
-    float pstep =              1. / params.degree; 
 
     vec2 t0 = (t01 - t00) * u + t00;
     vec2 t1 = (t11 - t10) * u + t10;
@@ -45,6 +43,9 @@ void main()
     vec4 p01 = gl_in[1].gl_Position;
     vec4 p10 = gl_in[2].gl_Position;
     vec4 p11 = gl_in[3].gl_Position;
+    
+    float tstep = (t01.y - t00.y) / params.degree; 
+    float pstep = (p01.z - p00.z) / params.degree; 
     
     vec4 p0 = (p01 - p00) * u + p00;
     vec4 p1 = (p11 - p10) * u + p10;
@@ -63,13 +64,13 @@ void main()
     pn0 += vertical * hn0;
     pn1 += vertical * hn1;
 
-    vec4 normal = normalize(vec4(cross((pn0 - p).xyz, (pn1-p).xyz), 0));
+    vec4 normal = vec4(normalize(cross((pn0 - p).xyz, (pn1-p).xyz)), 0);
     //vec4 normal = vec4(0, 1, 0, 0);
     //vec4 normal = normalize(pn0 - p);
 
     surf.texCoord = t;
     surf.height   = h;
-    surf.normal   = normal;
+    surf.normal = -normal;
 
-    gl_Position = params.mProjView * p;
+    gl_Position = params.mProjView * vec4(p.xyz, 1);
 }

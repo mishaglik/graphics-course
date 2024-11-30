@@ -4,6 +4,7 @@
 #include <etna/Sampler.hpp>
 #include <etna/Buffer.hpp>
 #include <etna/GraphicsPipeline.hpp>
+#include <etna/RenderTargetStates.hpp>
 #include <glm/glm.hpp>
 
 #include "Perlin.hpp"
@@ -22,6 +23,8 @@ public:
 
   void loadShaders();
   void allocateResources(glm::uvec2 swapchain_resolution);
+  void allocateGBuffer();
+
   void setupPipelines(vk::Format swapchain_format);
 
   void debugInput(const Keyboard& kb);
@@ -39,6 +42,9 @@ private:
   void renderPostprocess(
     vk::CommandBuffer cmd_buf, vk::Image target_image, vk::ImageView target_image_view);
 
+  void renderLights(vk::CommandBuffer cmd_buf);
+  
+
   void prepareFrame(const glm::mat4x4& glob_tm);
 
   void tonemapEvaluate(vk::CommandBuffer cmd_buf);
@@ -48,8 +54,12 @@ private:
   std::unique_ptr<SceneManager> sceneMgr;
 
 
-  etna::Image mainViewDepth;
   etna::Image backbuffer;
+
+  std::array<etna::Image, 3> gBuffer;
+  std::vector<etna::RenderTargetState::AttachmentParams> gBufferColorAttachments;
+  etna::RenderTargetState::AttachmentParams gBufferDepthAttachment;
+
   etna::Buffer constants;
 
   etna::Buffer histogramBuffer;
@@ -81,6 +91,7 @@ private:
   etna::ComputePipeline histogramPipeline{};
   etna::ComputePipeline distributionPipeline{};
 
+  etna::GraphicsPipeline deferredLightPipeline{};
   etna::GraphicsPipeline postprocessPipeline{};
   etna::Sampler defaultSampler;
   glm::uvec2 resolution;
@@ -91,6 +102,6 @@ private:
   };
   std::vector<std::size_t> nInstances;
 
-  bool useToneMap = true;
+  bool useToneMap = false;
   bool wireframe = false;
 };

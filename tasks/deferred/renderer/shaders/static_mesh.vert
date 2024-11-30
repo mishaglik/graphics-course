@@ -37,8 +37,8 @@ void main(void)
   const vec4 wTang = vec4(decode_normal(floatBitsToInt(vTexCoordAndTang.z)), 0.0f);
 
   vOut.wPos   = (ims.mModels[gl_InstanceIndex] * vec4(vPosNorm.xyz, 1.0f)).xyz;
-  vOut.wNorm  = normalize(mat3(transpose(inverse(params.mModel))) * wNorm.xyz);
-  vOut.wTangent = normalize(mat3(transpose(inverse(params.mModel))) * wTang.xyz);
+  vOut.wNorm  = normalize(mat3(transpose(inverse(ims.mModels[gl_InstanceIndex]))) * wNorm.xyz);
+  vOut.wTangent = normalize(mat3(transpose(inverse(ims.mModels[gl_InstanceIndex]))) * wTang.xyz);
   vOut.texCoord = vTexCoordAndTang.xy;
 
   gl_Position   = params.mProjView * vec4(vOut.wPos, 1.0);

@@ -22,4 +22,6 @@ target_add_shaders(deferred_renderer
   shaders/postprocess.frag
   shaders/histogram.comp
   shaders/distribution.comp
+  shaders/deferred.vert
+  shaders/deferred.frag
 )

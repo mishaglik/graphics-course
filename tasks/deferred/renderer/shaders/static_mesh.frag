@@ -4,6 +4,7 @@
 
 
 layout(location = 0) out vec4 out_fragColor;
+layout(location = 1) out vec4 out_fragNormal;
 
 layout(location = 0) in VS_OUT
 {
@@ -13,16 +14,28 @@ layout(location = 0) in VS_OUT
   vec2 texCoord;
 } surf;
 
+layout(push_constant) uniform params_t
+{
+  mat4 mProjView;
+  mat4 mModel;
+  uint relemIdx;
+} params;
+
+
+const vec2 resolution = vec2(1280, 720);
+
+vec3 getPos() {
+  return vec3(
+    (2 * gl_FragCoord.x / resolution.x) - 1,
+    (2 * gl_FragCoord.y / resolution.y) - 1,
+    gl_FragCoord.z
+  ) / gl_FragCoord.w;
+}
+
 void main()
 {
-  const vec3 wLightPos = vec3(10, 10, 10);
-  const vec3 surfaceColor = vec3(1.0f, 1.0f, 1.0f);
+  out_fragColor = vec4(1., 1., 1., 0);
+  out_fragNormal.rgb = surf.wNorm;
+  out_fragNormal.w = gl_FragCoord.w;
 
-  const vec3 lightColor = vec3(1.0f, 1.0f, 1.0f);
-
-  const vec3 lightDir   = normalize(wLightPos - surf.wPos);
-  const vec3 diffuse = max(dot(surf.wNorm, lightDir), 0.0f) * lightColor;
-  const float ambient = 0.05;
-  out_fragColor.rgb = (diffuse + ambient) * surfaceColor;
-  out_fragColor.a = 1.0f;
 }

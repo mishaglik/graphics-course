@@ -24,4 +24,7 @@ target_add_shaders(deferred_renderer
   shaders/distribution.comp
   shaders/deferred.vert
   shaders/deferred.frag
+  shaders/sphere.vert
+  shaders/sphere.frag
+  shaders/sphere_deferred.frag
 )

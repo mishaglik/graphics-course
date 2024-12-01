@@ -12,20 +12,12 @@ layout (location = 0 ) in VS_OUT
 layout(binding = 0) uniform sampler2D albedo;
 layout(binding = 1) uniform sampler2D normal;
 layout(binding = 2) uniform sampler2D  depth;
-layout(std140, binding = 3) readonly buffer lp_t
-{
-  vec4 position[];
-} lightPos;
-
-layout(std140, binding = 4) readonly buffer lc_t
-{
-  vec4 color[];
-} lightCol;
 
 layout(push_constant) uniform pc_t
 {
     mat4 mProjView;
-    int nLights;
+    vec4 position;
+    vec4 color;
 } params;
 
 const vec2 resolution = vec2(1280, 720);
@@ -57,20 +49,9 @@ void main(void)
   const float wc    = normal_wc.w;
   const float depthV = texture(depth, surf.texCoord).w;
   const vec3 pos = getPos(depthV, wc);
-  
-  //first light is sun
-  out_fragColor = getLight((params.mProjView * vec4(lightPos.position[0].xyz, 1)).xyz, pos, normal, lightCol.color[0].rgb);
-  
-  for(int i = 1; i < params.nLights; ++i) {
-    vec4 lightPosRange = lightPos.position[i];
-    const vec3 wLightPos = (params.mProjView * vec4(lightPosRange.xyz, 1)).rgb;
-  
-    if(length(transpose(ipv3) * (wLightPos - pos)) < lightPosRange.w) {
-      out_fragColor += getLight(wLightPos.xyz, pos, normal, lightCol.color[i].rgb);
-    }
-  }
+  // Only sunlight. Other are in sphere_deferred;
+  out_fragColor = getLight((params.mProjView * vec4(params.position.xyz, 1)).xyz, pos, normal, params.color.rgb);
   out_fragColor.rgb *= surfaceColor;
 
-  gl_FragDepth = depthV;
 }
 

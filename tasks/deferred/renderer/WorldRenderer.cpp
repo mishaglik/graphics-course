@@ -165,6 +165,18 @@ void WorldRenderer::loadShaders()
     {DEFERRED_RENDERER_SHADERS_ROOT "deferred.vert.spv",
      DEFERRED_RENDERER_SHADERS_ROOT "deferred.frag.spv"}
   );
+
+  etna::create_program(
+    "sphere_deferred_shader",
+    {DEFERRED_RENDERER_SHADERS_ROOT "sphere.vert.spv",
+     DEFERRED_RENDERER_SHADERS_ROOT "sphere_deferred.frag.spv"}
+  );
+
+  etna::create_program(
+    "sphere_shader",
+    {DEFERRED_RENDERER_SHADERS_ROOT "sphere.vert.spv",
+     DEFERRED_RENDERER_SHADERS_ROOT "sphere.frag.spv"}
+  );
   etna::create_program("static_mesh", {DEFERRED_RENDERER_SHADERS_ROOT "static_mesh.vert.spv"});
   spdlog::info("Shaders loaded");
 }
@@ -300,6 +312,84 @@ void WorldRenderer::setupPipelines(vk::Format swapchain_format)
         {
           .colorAttachmentFormats = {BACKBUFFER_FORMAT},
         },
+    });
+
+    spherePipeline = pipelineManager.createGraphicsPipeline(
+    "sphere_shader",
+    etna::GraphicsPipeline::CreateInfo{
+      .inputAssemblyConfig = { 
+        .topology = vk::PrimitiveTopology::eTriangleStrip,
+      },
+      .rasterizationConfig = {
+        .polygonMode = vk::PolygonMode::eFill,
+        .cullMode = vk::CullModeFlagBits::eBack,
+        .lineWidth = 1.f,
+      },
+     
+      .blendingConfig = {
+        .attachments = {
+          vk::PipelineColorBlendAttachmentState{
+            .blendEnable = vk::True,
+            .srcColorBlendFactor = vk::BlendFactor::eSrcAlpha,
+            .dstColorBlendFactor = vk::BlendFactor::eOne,
+            .colorBlendOp = vk::BlendOp::eAdd,
+            .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+              vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
+          },
+        },
+        .logicOpEnable = false,
+        .logicOp = {},
+        .blendConstants = {},
+      },
+      .depthConfig = {
+        .depthTestEnable = vk::True,
+        .depthWriteEnable = vk::False,
+        .depthCompareOp = vk::CompareOp::eLessOrEqual,
+        .maxDepthBounds = 1.f,
+      },
+      .fragmentShaderOutput = {
+        .colorAttachmentFormats = {BACKBUFFER_FORMAT},
+        .depthAttachmentFormat = gBuffer.back().getFormat(),
+      },
+    });
+
+    sphereDeferredPipeline = pipelineManager.createGraphicsPipeline(
+    "sphere_deferred_shader",
+    etna::GraphicsPipeline::CreateInfo{
+      .inputAssemblyConfig = { 
+        .topology = vk::PrimitiveTopology::eTriangleStrip,
+      },
+      .rasterizationConfig = {
+        .polygonMode = vk::PolygonMode::eFill,
+        .cullMode = vk::CullModeFlagBits::eFront,
+        .lineWidth = 1.f,
+      },
+     
+      .blendingConfig = {
+        .attachments = {
+          vk::PipelineColorBlendAttachmentState{
+            .blendEnable = vk::True,
+            .srcColorBlendFactor = vk::BlendFactor::eSrcAlpha,
+            .dstColorBlendFactor = vk::BlendFactor::eOne,
+            .colorBlendOp = vk::BlendOp::eAdd,
+            .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+              vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
+          },
+        },
+        .logicOpEnable = false,
+        .logicOp = {},
+        .blendConstants = {},
+      },
+      .depthConfig = {
+        .depthTestEnable = vk::True,
+        .depthWriteEnable = vk::False,
+        .depthCompareOp = vk::CompareOp::eGreaterOrEqual,
+        .maxDepthBounds = 1.f,
+      },
+      .fragmentShaderOutput = {
+        .colorAttachmentFormats = {BACKBUFFER_FORMAT},
+        .depthAttachmentFormat = gBuffer.back().getFormat(),
+      },
     });
 
   histogramPipeline = pipelineManager.createComputePipeline("histogram_compute", {});
@@ -831,49 +921,255 @@ void WorldRenderer::renderLights(vk::CommandBuffer cmd_buf)
       vk::ImageAspectFlagBits::eDepth
     );
   etna::flush_barriers(cmd_buf);
+   {
+    etna::RenderTargetState renderTargets(
+      cmd_buf,
+      {{0, 0}, {resolution.x, resolution.y}},
+      {{.image = backbuffer.get(), .view = backbuffer.getView({})}},
+      {}
+    );
 
-  etna::RenderTargetState renderTargets(
+    auto deferredLightShader = etna::get_shader_program("deferred_shader");
+    auto& pipeline = deferredLightPipeline;
+
+    cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.getVkPipeline());
+
+    auto set = etna::create_descriptor_set(
+      deferredLightShader.getDescriptorLayoutId(0),
+      cmd_buf,
+      {
+        etna::Binding{0, gBuffer[0].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+        etna::Binding{1, gBuffer[1].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+        etna::Binding{2, gBuffer[2].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+      }
+    );
+    assert(gBuffer.size() == 3);
+    
+    cmd_buf.bindDescriptorSets(
+      vk::PipelineBindPoint::eGraphics,
+      pipeline.getVkPipelineLayout(),
+      0,
+      {set.getVkSet()},
+      {}
+    );
+
+    struct {glm::mat4x4 pv; glm::vec4 pos, color;} pushConstants{worldViewProj, sceneMgr->getLights()[0].position, sceneMgr->getLights()[0].color};
+
+    cmd_buf.pushConstants(
+      pipeline.getVkPipelineLayout(), 
+      vk::ShaderStageFlagBits::eFragment,
+      0,
+      uint32_t(sizeof(pushConstants)),
+      &pushConstants
+    );
+
+    cmd_buf.draw(3, 1, 0, 0);
+  }
+  renderSphereDeferred(cmd_buf);
+  renderSphere(cmd_buf);
+}
+
+namespace {
+class CustomRenderTargetState {
+  vk::CommandBuffer commandBuffer;
+  static bool inScope;
+
+public:
+  struct AttachmentParams
+  {
+    vk::Image image = VK_NULL_HANDLE;
+    vk::ImageView view = VK_NULL_HANDLE;
+    std::optional<vk::ImageAspectFlags> imageAspect{};
+    vk::AttachmentLoadOp loadOp = vk::AttachmentLoadOp::eClear;
+    vk::AttachmentStoreOp storeOp = vk::AttachmentStoreOp::eStore;
+    vk::ClearColorValue clearColorValue = std::array<float, 4>({0.0f, 0.0f, 0.0f, 1.0f});
+    vk::ClearDepthStencilValue clearDepthStencilValue = {1.0f, 0};
+    vk::ImageLayout layout = vk::ImageLayout::eUndefined;
+
+    // By default, the render target can work with multisample images and pipelines,
+    // but not produce a final single-sample result.
+    // These fields below are for the final MSAA image.
+    // Ignore unless you know what MSAA is and aren't sure you need it.
+    vk::Image resolveImage = VK_NULL_HANDLE;
+    vk::ImageView resolveImageView = VK_NULL_HANDLE;
+    std::optional<vk::ImageAspectFlags> resolveImageAspect{};
+    vk::ResolveModeFlagBits resolveMode = vk::ResolveModeFlagBits::eNone;
+  };
+
+  CustomRenderTargetState(
+    vk::CommandBuffer cmd_buff,
+    vk::Rect2D rect,
+    const std::vector<AttachmentParams>& color_attachments,
+    AttachmentParams depth_attachment,
+    AttachmentParams stencil_attachment);
+  ~CustomRenderTargetState();
+  };
+bool CustomRenderTargetState::inScope = false;
+
+CustomRenderTargetState::CustomRenderTargetState(
+  vk::CommandBuffer cmd_buff,
+  vk::Rect2D rect,
+  const std::vector<AttachmentParams>& color_attachments,
+  AttachmentParams depth_attachment,
+  AttachmentParams stencil_attachment)
+{
+  ETNA_VERIFYF(!inScope, "RenderTargetState scopes shouldn't overlap.");
+  inScope = true;
+  commandBuffer = cmd_buff;
+  vk::Viewport viewport{
+    .x = static_cast<float>(rect.offset.x),
+    .y = static_cast<float>(rect.offset.y),
+    .width = static_cast<float>(rect.extent.width),
+    .height = static_cast<float>(rect.extent.height),
+    .minDepth = 0.0f,
+    .maxDepth = 1.0f,
+  };
+
+  commandBuffer.setViewport(0, {viewport});
+  commandBuffer.setScissor(0, {rect});
+
+  std::vector<vk::RenderingAttachmentInfo> attachmentInfos(color_attachments.size());
+  for (uint32_t i = 0; i < color_attachments.size(); ++i)
+  {
+    attachmentInfos[i].imageView = color_attachments[i].view;
+    attachmentInfos[i].imageLayout = (color_attachments[i].layout != vk::ImageLayout::eUndefined) ?  color_attachments[i].layout : vk::ImageLayout::eColorAttachmentOptimal;
+    attachmentInfos[i].loadOp = color_attachments[i].loadOp;
+    attachmentInfos[i].storeOp = color_attachments[i].storeOp;
+    attachmentInfos[i].clearValue = color_attachments[i].clearColorValue;
+  }
+
+  vk::RenderingAttachmentInfo depthAttInfo{
+    .imageView = depth_attachment.view,
+    .imageLayout = (depth_attachment.layout != vk::ImageLayout::eUndefined) ? depth_attachment.layout : vk::ImageLayout::eDepthStencilAttachmentOptimal,
+    .resolveMode = depth_attachment.resolveMode,
+    .resolveImageView = depth_attachment.resolveImageView,
+    .resolveImageLayout = vk::ImageLayout::eGeneral,
+    .loadOp = depth_attachment.loadOp,
+    .storeOp = depth_attachment.storeOp,
+    .clearValue = depth_attachment.clearDepthStencilValue,
+  };
+
+  vk::RenderingAttachmentInfo stencilAttInfo{
+    .imageView = stencil_attachment.view,
+    .imageLayout = (stencil_attachment.layout != vk::ImageLayout::eUndefined) ? stencil_attachment.layout : vk::ImageLayout::eDepthStencilAttachmentOptimal,
+    .resolveMode = stencil_attachment.resolveMode,
+    .resolveImageView = stencil_attachment.resolveImageView,
+    .resolveImageLayout = vk::ImageLayout::eGeneral,
+    .loadOp = stencil_attachment.loadOp,
+    .storeOp = stencil_attachment.storeOp,
+    .clearValue = stencil_attachment.clearDepthStencilValue,
+  };
+
+  vk::RenderingInfo renderInfo{
+    .renderArea = rect,
+    .layerCount = 1,
+    .colorAttachmentCount = static_cast<uint32_t>(attachmentInfos.size()),
+    .pColorAttachments = attachmentInfos.empty() ? nullptr : attachmentInfos.data(),
+    .pDepthAttachment = depth_attachment.view ? &depthAttInfo : nullptr,
+    .pStencilAttachment = stencil_attachment.view ? &stencilAttInfo : nullptr,
+  };
+  commandBuffer.beginRendering(renderInfo);
+}
+
+CustomRenderTargetState::~CustomRenderTargetState()
+{
+  commandBuffer.endRendering();
+  inScope = false;
+}
+
+} /* namespace */
+
+void WorldRenderer::renderSphereDeferred(vk::CommandBuffer cmd_buf)
+{
+  ETNA_PROFILE_GPU(cmd_buf, renderSphereDeferred);
+  etna::set_state(cmd_buf, 
+    gBuffer.back().get(), 
+    vk::PipelineStageFlagBits2::eFragmentShader | vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests, 
+    vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eDepthStencilAttachmentRead, 
+    vk::ImageLayout::eDepthReadOnlyStencilAttachmentOptimal, 
+    vk::ImageAspectFlagBits::eDepth
+  );
+  etna::flush_barriers(cmd_buf);
+  CustomRenderTargetState renderTargets(
     cmd_buf,
     {{0, 0}, {resolution.x, resolution.y}},
-    {{.image = backbuffer.get(), .view = backbuffer.getView({})}},
+    {{.image = backbuffer.get(), .view = backbuffer.getView({}), .loadOp = vk::AttachmentLoadOp::eLoad,}},
+    {.image = gBuffer.back().get(), .view = gBuffer.back().getView({}), .loadOp = vk::AttachmentLoadOp::eLoad, .storeOp = vk::AttachmentStoreOp::eNone, .layout=vk::ImageLayout::eDepthReadOnlyStencilAttachmentOptimal},
     {}
   );
-
-  auto deferredLightShader = etna::get_shader_program("deferred_shader");
-  auto& pipeline = deferredLightPipeline;
+  auto sphereShader = etna::get_shader_program("sphere_deferred_shader");
+  auto& pipeline = sphereDeferredPipeline;
 
   cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.getVkPipeline());
 
   auto set = etna::create_descriptor_set(
-    deferredLightShader.getDescriptorLayoutId(0),
+      sphereShader.getDescriptorLayoutId(0),
+      cmd_buf,
+      {
+        etna::Binding{0, gBuffer[0].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+        etna::Binding{1, gBuffer[1].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+        etna::Binding{2, gBuffer[2].genBinding(defaultSampler.get(), vk::ImageLayout::eDepthReadOnlyStencilAttachmentOptimal)},
+      }
+    );
+    assert(gBuffer.size() == 3);
+    
+    cmd_buf.bindDescriptorSets(
+      vk::PipelineBindPoint::eGraphics,
+      pipeline.getVkPipelineLayout(),
+      0,
+      {set.getVkSet()},
+      {}
+    );
+  auto& lights = sceneMgr->getLights();
+  for(std::size_t i = 1; i < lights.size(); ++i) {
+    const float dist = glm::length(glm::vec3(worldViewProj * glm::vec4(lights[i].position.x, lights[i].position.y, lights[i].position.z, 1)));
+    const float fovCorrection = glm::length(glm::vec3(worldViewProj[0]));
+    uint32_t n = static_cast<uint32_t>((500.f * fovCorrection * lights[i].position.w / dist)) + 1;
+    n = std::min(n, 128u);
+    struct {glm::mat4x4 pv; glm::vec4 pos, color; float degree;} pushConstants{worldViewProj, lights[i].position, lights[i].color, M_PIf / n};
+
+    cmd_buf.pushConstants(
+      pipeline.getVkPipelineLayout(), 
+      vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+      0,
+      uint32_t(sizeof(pushConstants)),
+      &pushConstants
+    );
+
+    cmd_buf.draw(2 * n + 2, n, 0, 0);
+  }
+}
+
+void WorldRenderer::renderSphere(vk::CommandBuffer cmd_buf)
+{
+  ETNA_PROFILE_GPU(cmd_buf, renderSphere);
+  CustomRenderTargetState renderTargets(
     cmd_buf,
-    {
-      etna::Binding{0, gBuffer[0].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
-      etna::Binding{1, gBuffer[1].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
-      etna::Binding{2, gBuffer[2].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
-      etna::Binding{3, sceneMgr->getLightSourcesPosBuffer().genBinding()},
-      etna::Binding{4, sceneMgr->getLightSourcesColBuffer().genBinding()},
-    }
-  );
-  assert(gBuffer.size() == 3);
-  
-  cmd_buf.bindDescriptorSets(
-    vk::PipelineBindPoint::eGraphics,
-    pipeline.getVkPipelineLayout(),
-    0,
-    {set.getVkSet()},
+    {{0, 0}, {resolution.x, resolution.y}},
+    {{.image = backbuffer.get(), .view = backbuffer.getView({}), .loadOp = vk::AttachmentLoadOp::eLoad,}},
+    {.image = gBuffer.back().get(), .view = gBuffer.back().getView({}), .loadOp = vk::AttachmentLoadOp::eLoad, .storeOp = vk::AttachmentStoreOp::eNone, .layout=vk::ImageLayout::eDepthReadOnlyStencilAttachmentOptimal},
     {}
   );
+  auto& pipeline = spherePipeline;
 
-  struct {glm::mat4x4 pv; int nLights;} pushConstants{worldViewProj, sceneMgr->nLights()};
+  cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.getVkPipeline());
 
-  cmd_buf.pushConstants(
-    pipeline.getVkPipelineLayout(), 
-    vk::ShaderStageFlagBits::eFragment,
-    0,
-    uint32_t(sizeof(pushConstants)),
-    &pushConstants
-  );
+  auto& lights = sceneMgr->getLights();
+  for(std::size_t i = 1; i < lights.size(); ++i) {
+    const float dist = glm::length(glm::vec3(worldViewProj * glm::vec4(lights[i].position.x, lights[i].position.y, lights[i].position.z, 1)));
+    const float fovCorrection = glm::length(glm::vec3(worldViewProj[0]));
+    uint32_t n = static_cast<uint32_t>((500.f * fovCorrection * lights[i].visibleRadius / dist)) + 1;
+    n = std::min(n, 128u);
+    struct {glm::mat4x4 pv; glm::vec4 pos, color; float degree;} pushConstants{worldViewProj, lights[i].position, lights[i].color, M_PIf / n};
+    pushConstants.pos.w = lights[i].visibleRadius;
+    cmd_buf.pushConstants(
+      pipeline.getVkPipelineLayout(), 
+      vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+      0,
+      uint32_t(sizeof(pushConstants)),
+      &pushConstants
+    );
 
-  cmd_buf.draw(3, 1, 0, 0);
+    cmd_buf.draw(2 * n + 2, n, 0, 0);
+  }
 }

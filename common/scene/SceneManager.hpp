@@ -53,13 +53,16 @@ public:
   vk::Buffer getVertexBuffer() { return unifiedVbuf.get(); }
   vk::Buffer getIndexBuffer() { return unifiedIbuf.get(); }
   
-  etna::Buffer& getLightSourcesPosBuffer() { return unifiedLPbuf; }
-  etna::Buffer& getLightSourcesColBuffer() { return unifiedLCbuf; }
-
 
   etna::VertexByteStreamFormatDescription getVertexFormatDescription();
 
-  int nLights() const { return static_cast<int>(lightSourcesPoses.size()); }
+  struct LightSource {
+    glm::vec4 position;
+    glm::vec4 color;
+    float visibleRadius = 0.f;
+  };
+
+  const std::vector<LightSource>& getLights() const { return lightSources; }
 
 private:
 
@@ -97,6 +100,7 @@ private:
   void uploadData(std::span<const Vertex> vertices, std::span<const std::uint32_t>);
 
   void setupLights();
+
 private:
   tinygltf::TinyGLTF loader;
   std::unique_ptr<etna::OneShotCmdMgr> oneShotCommands;
@@ -110,9 +114,6 @@ private:
 
   etna::Buffer unifiedVbuf;
   etna::Buffer unifiedIbuf;
-  etna::Buffer unifiedLPbuf;
-  etna::Buffer unifiedLCbuf;
 
-  std::vector<glm::vec4> lightSourcesPoses;
-  std::vector<glm::vec4> lightSourcesColors;
+  std::vector<LightSource> lightSources;
 };

@@ -44,6 +44,8 @@ private:
 
   void renderLights(vk::CommandBuffer cmd_buf);
   
+  void renderSphereDeferred(vk::CommandBuffer cmd_buf);
+  void renderSphere(vk::CommandBuffer cmd_buf);
 
   void prepareFrame(const glm::mat4x4& glob_tm);
 
@@ -92,6 +94,9 @@ private:
   etna::ComputePipeline distributionPipeline{};
 
   etna::GraphicsPipeline deferredLightPipeline{};
+  etna::GraphicsPipeline sphereDeferredPipeline{};
+  etna::GraphicsPipeline spherePipeline{};
+
   etna::GraphicsPipeline postprocessPipeline{};
   etna::Sampler defaultSampler;
   glm::uvec2 resolution;

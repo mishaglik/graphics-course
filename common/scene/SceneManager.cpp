@@ -469,23 +469,8 @@ void SceneManager::uploadData(
     .name = "unifiedIbuf",
   });
 
-  unifiedLCbuf = etna::get_context().createBuffer(etna::Buffer::CreateInfo{
-    .size = std::span(lightSourcesColors).size_bytes(),
-    .bufferUsage = vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer,
-    .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
-    .name = "unifiedLbuf",
-  });
-  unifiedLPbuf = etna::get_context().createBuffer(etna::Buffer::CreateInfo{
-    .size = std::span(lightSourcesPoses).size_bytes(),
-    .bufferUsage = vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer,
-    .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
-    .name = "unifiedLbuf",
-  });
-
   transferHelper.uploadBuffer<Vertex>(*oneShotCommands, unifiedVbuf, 0, vertices);
   transferHelper.uploadBuffer<std::uint32_t>(*oneShotCommands, unifiedIbuf, 0, indices);
-  transferHelper.uploadBuffer<glm::vec4>(*oneShotCommands, unifiedLPbuf, 0, lightSourcesPoses);
-  transferHelper.uploadBuffer<glm::vec4>(*oneShotCommands, unifiedLCbuf, 0, lightSourcesColors);
 }
 
 void SceneManager::selectScene(std::filesystem::path path)
@@ -571,61 +556,36 @@ void SceneManager::setupLights()
 {
 
   const float lampRange = 2.5f;
-  const float bugRange = 0.4f;
-  lightSourcesPoses = {
-  /* 0*/  {0.f, 40.f, 0.f,  0.f},
-  /* 1*/  {  -2.5630727f,  1.4107137f,   6.890522f, lampRange}, 
-  /* 2*/  {   2.4905527f,  1.4413857f,   1.512132f, lampRange}, 
-  /* 3*/  {  -0.7068754f,  1.4591746f,  -2.777065f, lampRange},
-  /* 4*/  {  -0.6854431f,  1.5465388f,  -6.792568f, lampRange},
-  /* 5*/  {   2.4870062f,  1.4218036f,  -6.782385f, lampRange},
-  /* 6*/  {   2.4570112f,  1.5047158f,  -2.755790f, lampRange},
-  /* 7*/  {   2.4768906f,  1.4559691f,   1.476415f, lampRange},
-  /* 8*/  {  -2.2359478f,  1.4744445f,   1.737469f, lampRange},
-  /* 9*/  {   2.8261878f,  1.3479835f,   1.977847f,  bugRange},
-  /*10*/  {   2.6073039f,  1.5171486f,   1.263106f,  bugRange},
-  /*11*/  {  -4.0668960f, -1.6299276f,  -8.455827f,  bugRange},
-  /*12*/  {  -7.8137620f, -0.8250914f, -10.178850f,  bugRange},
-  /*13*/  { -15.5644180f,  2.1619153f,  -5.488131f,  bugRange},
-  /*14*/  { -18.3982730f,  0.3639415f,  -1.232591f,  bugRange},
-  /*15*/  { -13.8580230f, -1.9076519f,   9.474797f,  bugRange},
-  /*16*/  {  -4.9035020f, -1.1138389f,   9.104493f,  bugRange},
-  /*17*/  {  15.1646660f, -5.8738947f,  10.840951f,  bugRange},
-  /*18*/  {  15.5161990f, -5.8145804f,   9.848208f,  bugRange},
-  /*19*/  {  15.7284720f, -5.7917670f,   9.248762f,  bugRange},
-  /*20*/  {  15.0396520f, -5.7861010f,   7.578271f,  bugRange},
-  /*21*/  {  14.9165880f, -5.6621490f,   6.895270f,  bugRange},
-  };
-
   const glm::vec4 lampColor = glm::vec4(0.8, 0.8, 0, 1);
-  lightSourcesColors = {
-    /* 0*/ glm::vec4(0.6, 0.6, 0.6, 1.),
-    /* 1*/ lampColor,
-    /* 2*/ lampColor,
-    /* 3*/ lampColor,
-    /* 4*/ lampColor,
-    /* 5*/ lampColor,
-    /* 6*/ lampColor,
-    /* 7*/ lampColor,
-    /* 8*/ lampColor,
-    /* 9*/ randomColor(),
-    /*10*/ randomColor(),
-    /*11*/ randomColor(),
-    /*12*/ randomColor(),
-    /*13*/ randomColor(),
-    /*14*/ randomColor(),
-    /*15*/ randomColor(),
-    /*16*/ randomColor(),
-    /*17*/ randomColor(),
-    /*18*/ randomColor(),
-    /*19*/ randomColor(),
-    /*20*/ randomColor(),
-    /*21*/ randomColor(),
+  const float bugRange = 0.4f;
+
+  lightSources = {
+  /* 0*/  {{0.f, 40.f, 0.f,  0.f}, glm::vec4(0.6, 0.6, 0.6, 1.)},
+  /* 1*/  {{  -2.5630727f,  1.4107137f,   6.890522f, lampRange}, lampColor, .05f}, 
+  /* 2*/  {{   2.4905527f,  1.4413857f,   1.512132f, lampRange}, lampColor, .05f}, 
+  /* 3*/  {{  -0.7068754f,  1.4591746f,  -2.777065f, lampRange}, lampColor, .05f},
+  /* 4*/  {{  -0.6854431f,  1.5465388f,  -6.792568f, lampRange}, lampColor, .05f},
+  /* 5*/  {{   2.4870062f,  1.4218036f,  -6.782385f, lampRange}, lampColor, .05f},
+  /* 6*/  {{   2.4570112f,  1.5047158f,  -2.755790f, lampRange}, lampColor, .05f},
+  /* 7*/  {{   2.4768906f,  1.4559691f,   1.476415f, lampRange}, lampColor, .05f},
+  /* 8*/  {{  -2.2359478f,  1.4744445f,   1.737469f, lampRange}, lampColor, .05f},
+  /* 9*/  {{   2.8261878f,  1.3479835f,   1.977847f,  bugRange}, randomColor(), bugRange / 10},
+  /*10*/  {{   2.6073039f,  1.5171486f,   1.263106f,  bugRange}, randomColor(), bugRange / 10},
+  /*11*/  {{  -4.0668960f, -1.6299276f,  -8.455827f,  bugRange}, randomColor(), bugRange / 10},
+  /*12*/  {{  -7.8137620f, -0.8250914f, -10.178850f,  bugRange}, randomColor(), bugRange / 10},
+  /*13*/  {{ -15.5644180f,  2.1619153f,  -5.488131f,  bugRange}, randomColor(), bugRange / 10},
+  /*14*/  {{ -18.3982730f,  0.3639415f,  -1.232591f,  bugRange}, randomColor(), bugRange / 10},
+  /*15*/  {{ -13.8580230f, -1.9076519f,   9.474797f,  bugRange}, randomColor(), bugRange / 10},
+  /*16*/  {{  -4.9035020f, -1.1138389f,   9.104493f,  bugRange}, randomColor(), bugRange / 10},
+  /*17*/  {{  15.1646660f, -5.8738947f,  10.840951f,  bugRange}, randomColor(), bugRange / 10},
+  /*18*/  {{  15.5161990f, -5.8145804f,   9.848208f,  bugRange}, randomColor(), bugRange / 10},
+  /*19*/  {{  15.7284720f, -5.7917670f,   9.248762f,  bugRange}, randomColor(), bugRange / 10},
+  /*20*/  {{  15.0396520f, -5.7861010f,   7.578271f,  bugRange}, randomColor(), bugRange / 10},
+  /*21*/  {{  14.9165880f, -5.6621490f,   6.895270f,  bugRange}, randomColor(), bugRange / 10},
   };
 
-  for (size_t i = 0; i < 100; ++i) {
+  for (size_t i = 0; i < 1000; ++i) {
     auto randCoord = []() {return (rand() % 400 - 200) / 10.f;};
-    lightSourcesPoses.emplace_back(randCoord(), 8.f, randCoord(), 5.f);
-    lightSourcesColors.push_back(randomColor());
+    lightSources.emplace_back(glm::vec4{randCoord(), rand() % 10, randCoord(), 1.f}, randomColor(), 0.1f);
   }
 }

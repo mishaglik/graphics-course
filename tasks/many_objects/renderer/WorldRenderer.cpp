@@ -164,49 +164,25 @@ void WorldRenderer::renderWorld(
   }
 }
 
-static bool IsVisble(const glm::mat2x3 bounds, const glm::mat4x4& transform)
+static bool IsNotVisble(const glm::mat2x3 bounds, const glm::mat4x4& transform)
 {
-  glm::vec4 origin = glm::vec4(bounds[0], 1.f);
-  glm::mat4x4 corners[2] = {
-    {
-      { bounds[1].x,  bounds[1].y,  bounds[1].z, 0.},
-      { bounds[1].x,  bounds[1].y, -bounds[1].z, 0.},
-      { bounds[1].x, -bounds[1].y,  bounds[1].z, 0.},
-      { bounds[1].x, -bounds[1].y, -bounds[1].z, 0.},
-    },
-    {
-      {-bounds[1].x,  bounds[1].y,  bounds[1].z, 0.},
-      {-bounds[1].x,  bounds[1].y, -bounds[1].z, 0.},
-      {-bounds[1].x, -bounds[1].y,  bounds[1].z, 0.},
-      {-bounds[1].x, -bounds[1].y, -bounds[1].z, 0.},
-    }};
-  corners[0] += origin;
-  corners[0] = transform * corners[0];
+  const glm::vec3 origin = transform * glm::vec4(bounds[0], 1.f);
+  glm::mat3 oldExtent = glm::mat3(
+    bounds[1].x, 0, 0,
+    0, bounds[1].y, 0,
+    0, 0, bounds[1].z
+  );
+  const glm::vec3 extent = glm::abs(glm::mat3(transform) * oldExtent) * glm::vec3(1.f, 1.f, 1.f);
+  
+  if(origin.z + extent.z < 0) return true;
 
-  for (size_t i = 0; i < 4; ++i)
-    corners[0][i] /= corners[0][i][3];
-
-  corners[1] += origin;
-  corners[1] = transform * corners[1];
-
-  for (size_t i = 0; i < 4; ++i)
-    corners[1][i] /= corners[1][i][3];
-
-  glm::vec3 min = corners[0][0];
-  glm::vec3 max = corners[0][0];
-  for (size_t i = 0; i < 2; ++i)
-    for (size_t j = 0; j < 4; ++j)
-    {
-      min = glm::min(min, glm::vec3(corners[i][j]));
-      max = glm::max(max, glm::vec3(corners[i][j]));
-    }
-
-  return min.x <  1. && 
-         max.x > -1. && 
-         min.y <  1. && 
-         max.y > -1. && 
-         min.y <  1. && 
-         max.y > -1. ;
+  glm::vec3 lc = glm::vec3(origin) + extent;
+  glm::vec3 rc = glm::vec3(origin) - extent;
+  return 
+        lc.x < -lc.z || 
+        lc.y < -lc.z || 
+        rc.x >  lc.z || 
+        rc.y >  lc.z;
 }
 
 void WorldRenderer::prepareFrame(const glm::mat4x4& glob_tm)
@@ -220,7 +196,6 @@ void WorldRenderer::prepareFrame(const glm::mat4x4& glob_tm)
 
   // May be do more fast clean
   std::memset(nInstances.data(), 0, nInstances.size() * sizeof(nInstances[0]));
-
   for (std::size_t i = 0; i < instanceMatrices.size(); ++i)
   {
     const auto meshIdx = instanceMeshes[i];
@@ -228,7 +203,7 @@ void WorldRenderer::prepareFrame(const glm::mat4x4& glob_tm)
     for (std::size_t j = 0; j < meshes[meshIdx].relemCount; j++)
     {
       const auto relemIdx = meshes[meshIdx].firstRelem + j;
-      if (!IsVisble(bbs[relemIdx], glob_tm * instanceMatrix))
+      if (IsNotVisble(bbs[relemIdx], glob_tm * instanceMatrix))
       {
         continue;
       }

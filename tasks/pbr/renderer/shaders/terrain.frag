@@ -4,6 +4,7 @@
 
 layout(location = 0) out vec4 out_fragColor;
 layout(location = 1) out vec4 out_fragNormal;
+layout(location = 2) out vec4 out_fragMaterial;
 
 layout (location = 0) in VS_OUT
 {
@@ -23,12 +24,24 @@ vec3 heightColor(float height)
 {
   if(height > 25)
     return vec3(0.9, 0.9, 0.91);
-  if(height < 8.01)
+  if(height < 14.01)
     return vec3(0.01, 0.01, 0.71);
-  if(height < 8.1)
+  if(height < 14.1)
     return vec3(0.81, 0.83, 0.23);
 
   return vec3(0.08, 0.31, 0.09);
+}
+
+vec4 heightMaterial(float height)
+{
+  if(height > 25)
+    return vec4(0, 0.5,   0, 1);
+  if(height < 14.01)
+    return vec4(0, 0.5,   0, 1);
+  if(height < 14.1)
+    return vec4(0, 0.5, 0.5, 1);
+
+  return vec4(0, 0.5, 0, 1);
 }
 
 void main(void)
@@ -36,7 +49,7 @@ void main(void)
   //out_fragColor = fract(surf.texCoord.x * 64.) < 0.5 ? vec4(1., 0., 0., 0) : vec4(0., 1., 0., 0);
   //out_fragColor = vec4(gl_FragCoord.z, depthToDist(gl_FragCoord.z) / far, 1., 0);
   out_fragColor.rgb = heightColor(surf.height);
-
   out_fragNormal = vec4(surf.normal.rgb, gl_FragCoord.w);
+  out_fragMaterial  = heightMaterial(surf.height);
 
 }

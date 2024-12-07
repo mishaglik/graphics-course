@@ -27,6 +27,6 @@ void main() {
   if (gl_VertexIndex == 3) 
     xy = vec2( 1,  1);
   xy = params.base + xy * params.extent;
-  gl_Position = vec4(20 * xy.x, -10, 20 * xy.y, 1);
+  gl_Position = vec4(20 * xy.x, -7, 20 * xy.y, 1);
   vOut.texCoord = xy * 0.5 + 0.5;
 }

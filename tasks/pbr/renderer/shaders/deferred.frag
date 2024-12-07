@@ -11,7 +11,8 @@ layout (location = 0 ) in VS_OUT
 
 layout(binding = 0) uniform sampler2D albedo;
 layout(binding = 1) uniform sampler2D normal;
-layout(binding = 2) uniform sampler2D  depth;
+layout(binding = 2) uniform sampler2D material;
+layout(binding = 3) uniform sampler2D depth;
 
 layout(push_constant) uniform pc_t
 {
@@ -52,6 +53,5 @@ void main(void)
   // Only sunlight. Other are in sphere_deferred;
   out_fragColor = getLight((params.mProjView * vec4(params.position.xyz, 1)).xyz, pos, normal, params.color.rgb);
   out_fragColor.rgb *= surfaceColor;
-
 }
 

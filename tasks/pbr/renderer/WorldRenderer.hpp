@@ -58,7 +58,7 @@ private:
 
   etna::Image backbuffer;
 
-  std::array<etna::Image, 3> gBuffer;
+  std::array<etna::Image, 4> gBuffer;
   std::vector<etna::RenderTargetState::AttachmentParams> gBufferColorAttachments;
   etna::RenderTargetState::AttachmentParams gBufferDepthAttachment;
 
@@ -73,6 +73,7 @@ private:
   {
     glm::mat4x4 projView;
     glm::mat4x4 model;
+    glm::vec4 color, emr_factors;
     glm::uint  instIdx;
   } pushConst2M;
 
@@ -109,4 +110,5 @@ private:
 
   bool useToneMap = false;
   bool wireframe = false;
+  bool normalMap = true;
 };

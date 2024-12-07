@@ -63,7 +63,8 @@ void WorldRenderer::allocateResources(glm::uvec2 swapchain_resolution)
 void WorldRenderer::allocateGBuffer() {
   auto& albedo = gBuffer[0];
   auto& normal = gBuffer[1];
-  auto& depth  = gBuffer[2];
+  auto& material  = gBuffer[2];
+  auto& depth     = gBuffer[3];
 
   auto& ctx = etna::get_context(); 
 
@@ -81,12 +82,21 @@ void WorldRenderer::allocateGBuffer() {
     .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
   });
 
+  material = ctx.createImage({
+    .extent = vk::Extent3D{resolution.x, resolution.y, 1},
+    .name = "gBuffer_material",
+    .format = vk::Format::eB8G8R8A8Unorm,
+    .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+  });
+
   depth = ctx.createImage({
     .extent = vk::Extent3D{resolution.x, resolution.y, 1},
     .name = "gBuffer_depth",
     .format = vk::Format::eD32Sfloat,
     .imageUsage = vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled,
   });
+
+
 
   gBufferColorAttachments = {
     etna::RenderTargetState::AttachmentParams {
@@ -99,7 +109,13 @@ void WorldRenderer::allocateGBuffer() {
       .view  = normal.getView({}),
       .imageAspect = vk::ImageAspectFlagBits::eColor,
     },
+    etna::RenderTargetState::AttachmentParams {
+      .image = material.get(),
+      .view  = material.getView({}),
+      .imageAspect = vk::ImageAspectFlagBits::eColor,
+    },
   };
+
   gBufferDepthAttachment = etna::RenderTargetState::AttachmentParams {
     .image = depth.get(),
     .view  = depth.getView({}),
@@ -215,6 +231,11 @@ void WorldRenderer::setupPipelines(vk::Format swapchain_format)
             .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
               vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
           },
+          vk::PipelineColorBlendAttachmentState{
+            .blendEnable = vk::False,
+            .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+              vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
+          },
         },
         .logicOpEnable = false,
         .logicOp = {},
@@ -225,6 +246,7 @@ void WorldRenderer::setupPipelines(vk::Format swapchain_format)
           .colorAttachmentFormats = {
             gBuffer[0].getFormat(), /*albedo*/
             gBuffer[1].getFormat(), /*normal*/
+            gBuffer[2].getFormat(), /*materials*/
           },
           .depthAttachmentFormat = gBuffer.back().getFormat(),
         },
@@ -250,6 +272,11 @@ void WorldRenderer::setupPipelines(vk::Format swapchain_format)
             .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
               vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
           },
+          vk::PipelineColorBlendAttachmentState{
+            .blendEnable = vk::False,
+            .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+              vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
+          },
         },
         .logicOpEnable = false,
         .logicOp = {},
@@ -261,6 +288,7 @@ void WorldRenderer::setupPipelines(vk::Format swapchain_format)
         .colorAttachmentFormats = {
           gBuffer[0].getFormat(), /*albedo*/
           gBuffer[1].getFormat(), /*normal*/
+          gBuffer[2].getFormat(), /*materials*/
         },
         .depthAttachmentFormat = gBuffer.back().getFormat(),
       },
@@ -289,6 +317,11 @@ void WorldRenderer::setupPipelines(vk::Format swapchain_format)
             .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
               vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
           },
+          vk::PipelineColorBlendAttachmentState{
+            .blendEnable = vk::False,
+            .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+              vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
+          },
         },
         .logicOpEnable = false,
         .logicOp = {},
@@ -299,6 +332,7 @@ void WorldRenderer::setupPipelines(vk::Format swapchain_format)
           .colorAttachmentFormats = {
             gBuffer[0].getFormat(), /*albedo*/
             gBuffer[1].getFormat(), /*normal*/
+            gBuffer[2].getFormat(), /*materials*/
           },
           .depthAttachmentFormat = gBuffer.back().getFormat(),
         },
@@ -411,6 +445,11 @@ void WorldRenderer::debugInput(const Keyboard& kb)
 {
   if (kb[KeyboardKey::kF3] == ButtonState::Falling) {
     wireframe = !wireframe;
+    spdlog::info("terrain wireframe is {}", wireframe ? "on" : "off");
+  }
+  if (kb[KeyboardKey::kN] == ButtonState::Falling) {
+    normalMap = !normalMap;
+    spdlog::info("normal maps are {}", normalMap ? "on" : "off");
   }
   if (kb[KeyboardKey::kT] == ButtonState::Falling)
   {
@@ -440,32 +479,50 @@ void WorldRenderer::renderScene(
 
   prepareFrame(glob_tm);
 
-  auto staticMesh = etna::get_shader_program("static_mesh");
+  auto staticMesh = etna::get_shader_program("static_mesh_material");
 
   cmd_buf.bindVertexBuffers(0, {sceneMgr->getVertexBuffer()}, {0});
   cmd_buf.bindIndexBuffer(sceneMgr->getIndexBuffer(), 0, vk::IndexType::eUint32);
 
-  auto set = etna::create_descriptor_set(
-    staticMesh.getDescriptorLayoutId(0),
-    cmd_buf,
-    {etna::Binding{0, instanceMatricesBuf.genBinding()}});
-
-  cmd_buf.bindDescriptorSets(
-    vk::PipelineBindPoint::eGraphics,
-    staticMeshPipeline.getVkPipelineLayout(),
-    0,
-    {set.getVkSet()},
-    {});
-
 
   pushConst2M.projView = glob_tm;
-
+  auto set0 = etna::create_descriptor_set(
+  staticMesh.getDescriptorLayoutId(0),
+  cmd_buf,
+  {
+    etna::Binding{0, instanceMatricesBuf.genBinding()},
+  });
   auto relems = sceneMgr->getRenderElements();
   std::size_t firstInstance = 0;
   for (std::size_t j = 0; j < relems.size(); ++j)
   {
+    
+    if (j == 8) //Skip drawing water as it is rendered by terrain  
+      continue;
     if (nInstances[j] != 0)
     {
+      Material::Id mid = relems[j].materialId;
+      auto& material = sceneMgr->get(mid == Material::Id::Invalid ? sceneMgr->getStubMaterial() : relems[j].materialId);
+      auto& baseColorImage = sceneMgr->get(material.baseColorTexture).image;
+      auto& normalImage = normalMap ? sceneMgr->get(material.normalTexture).image : sceneMgr->get(sceneMgr->getStubRedTexture()).image;
+      auto& metallicRoughnessImage = normalMap ? sceneMgr->get(material.metallicRoughnessTexture).image : sceneMgr->get(sceneMgr->getStubTexture()).image;
+      auto set1 = etna::create_descriptor_set(
+        staticMesh.getDescriptorLayoutId(1),
+        cmd_buf,
+        {
+          etna::Binding{0, baseColorImage        .genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+          etna::Binding{1, normalImage           .genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+          etna::Binding{2, metallicRoughnessImage.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+        });
+      pushConst2M.color = material.baseColor;
+      pushConst2M.emr_factors = material.EMR_Factor;
+      cmd_buf.bindDescriptorSets(
+        vk::PipelineBindPoint::eGraphics,
+        staticMeshPipeline.getVkPipelineLayout(),
+        0,
+        {set0.getVkSet(), set1.getVkSet()},
+        {});
+
       const auto& relem = relems[j];
       cmd_buf.pushConstants<PushConstants>(
         pipeline_layout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, {pushConst2M});
@@ -675,49 +732,25 @@ void WorldRenderer::renderWorld(
   renderPostprocess(cmd_buf, target_image, target_image_view);
 }
 
-static bool IsVisble(const glm::mat2x3 bounds, const glm::mat4x4& transform)
+static bool IsNotVisble(const glm::mat2x3 bounds, const glm::mat4x4& transform)
 {
-  glm::vec4 origin = glm::vec4(bounds[0], 1.f);
-  glm::mat4x4 corners[2] = {
-    {
-      { bounds[1].x,  bounds[1].y,  bounds[1].z, 0.},
-      { bounds[1].x,  bounds[1].y, -bounds[1].z, 0.},
-      { bounds[1].x, -bounds[1].y,  bounds[1].z, 0.},
-      { bounds[1].x, -bounds[1].y, -bounds[1].z, 0.},
-    },
-    {
-      {-bounds[1].x,  bounds[1].y,  bounds[1].z, 0.},
-      {-bounds[1].x,  bounds[1].y, -bounds[1].z, 0.},
-      {-bounds[1].x, -bounds[1].y,  bounds[1].z, 0.},
-      {-bounds[1].x, -bounds[1].y, -bounds[1].z, 0.},
-    }};
-  corners[0] += origin;
-  corners[0] = transform * corners[0];
+  const glm::vec3 origin = transform * glm::vec4(bounds[0], 1.f);
+  glm::mat3 oldExtent = glm::mat3(
+    bounds[1].x, 0, 0,
+    0, bounds[1].y, 0,
+    0, 0, bounds[1].z
+  );
+  const glm::vec3 extent = glm::abs(glm::mat3(transform) * oldExtent) * glm::vec3(1.f, 1.f, 1.f);
+  
+  if(origin.z + extent.z < 0) return true;
 
-  for (size_t i = 0; i < 4; ++i)
-    corners[0][i] /= corners[0][i][3];
-
-  corners[1] += origin;
-  corners[1] = transform * corners[1];
-
-  for (size_t i = 0; i < 4; ++i)
-    corners[1][i] /= corners[1][i][3];
-
-  glm::vec3 min = corners[0][0];
-  glm::vec3 max = corners[0][0];
-  for (size_t i = 0; i < 2; ++i)
-    for (size_t j = 0; j < 4; ++j)
-    {
-      min = glm::min(min, glm::vec3(corners[i][j]));
-      max = glm::max(max, glm::vec3(corners[i][j]));
-    }
-
-  return min.x <  1. && 
-         max.x > -1. && 
-         min.y <  1. && 
-         max.y > -1. && 
-         min.y <  1. && 
-         max.y > -1. ;
+  glm::vec3 lc = glm::vec3(origin) + extent;
+  glm::vec3 rc = glm::vec3(origin) - extent;
+  return 
+        lc.x < -lc.z || 
+        lc.y < -lc.z || 
+        rc.x >  lc.z || 
+        rc.y >  lc.z;
 }
 
 void WorldRenderer::prepareFrame(const glm::mat4x4& glob_tm)
@@ -739,7 +772,7 @@ void WorldRenderer::prepareFrame(const glm::mat4x4& glob_tm)
     for (std::size_t j = 0; j < meshes[meshIdx].relemCount; j++)
     {
       const auto relemIdx = meshes[meshIdx].firstRelem + j;
-      if (!IsVisble(bbs[relemIdx], glob_tm * instanceMatrix))
+      if (IsNotVisble(bbs[relemIdx], glob_tm * instanceMatrix))
       {
         continue;
       }
@@ -941,9 +974,10 @@ void WorldRenderer::renderLights(vk::CommandBuffer cmd_buf)
         etna::Binding{0, gBuffer[0].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
         etna::Binding{1, gBuffer[1].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
         etna::Binding{2, gBuffer[2].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+        etna::Binding{3, gBuffer[3].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
       }
     );
-    assert(gBuffer.size() == 3);
+    assert(gBuffer.size() == 4);
     
     cmd_buf.bindDescriptorSets(
       vk::PipelineBindPoint::eGraphics,
@@ -952,8 +986,8 @@ void WorldRenderer::renderLights(vk::CommandBuffer cmd_buf)
       {set.getVkSet()},
       {}
     );
-
-    struct {glm::mat4x4 pv; glm::vec4 pos, color;} pushConstants{worldViewProj, sceneMgr->getLights()[0].position, sceneMgr->getLights()[0].color};
+    LightSource::Id sunId = static_cast<LightSource::Id>(0);
+    struct {glm::mat4x4 pv; glm::vec4 pos, color;} pushConstants{worldViewProj, sceneMgr->getLights()[sunId].position, sceneMgr->getLights()[sunId].colorRange};
 
     cmd_buf.pushConstants(
       pipeline.getVkPipelineLayout(), 
@@ -1108,10 +1142,11 @@ void WorldRenderer::renderSphereDeferred(vk::CommandBuffer cmd_buf)
       {
         etna::Binding{0, gBuffer[0].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
         etna::Binding{1, gBuffer[1].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
-        etna::Binding{2, gBuffer[2].genBinding(defaultSampler.get(), vk::ImageLayout::eDepthReadOnlyStencilAttachmentOptimal)},
+        etna::Binding{2, gBuffer[2].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+        etna::Binding{3, gBuffer[3].genBinding(defaultSampler.get(), vk::ImageLayout::eDepthReadOnlyStencilAttachmentOptimal)},
       }
     );
-    assert(gBuffer.size() == 3);
+    assert(gBuffer.size() == 4);
     
     cmd_buf.bindDescriptorSets(
       vk::PipelineBindPoint::eGraphics,
@@ -1121,12 +1156,15 @@ void WorldRenderer::renderSphereDeferred(vk::CommandBuffer cmd_buf)
       {}
     );
   auto& lights = sceneMgr->getLights();
-  for(std::size_t i = 1; i < lights.size(); ++i) {
-    const float dist = glm::length(glm::vec3(worldViewProj * glm::vec4(lights[i].position.x, lights[i].position.y, lights[i].position.z, 1)));
+  for(const auto& light : lights) {
+    const float dist = glm::length(glm::vec3(worldViewProj * glm::vec4(light.position.x, light.position.y, light.position.z, 1)));
     const float fovCorrection = glm::length(glm::vec3(worldViewProj[0]));
-    uint32_t n = static_cast<uint32_t>((500.f * fovCorrection * lights[i].position.w / dist)) + 1;
+    uint32_t n = static_cast<uint32_t>((5000.f * fovCorrection * light.colorRange.w / dist));
+    if (n < 4) {
+      continue;
+    }
     n = std::min(n, 128u);
-    struct {glm::mat4x4 pv; glm::vec4 pos, color; float degree;} pushConstants{worldViewProj, lights[i].position, lights[i].color, M_PIf / n};
+    struct {glm::mat4x4 pv; glm::vec4 pos, color; float degree;} pushConstants{worldViewProj, light.position, light.colorRange, M_PIf / n};
 
     cmd_buf.pushConstants(
       pipeline.getVkPipelineLayout(), 
@@ -1155,13 +1193,16 @@ void WorldRenderer::renderSphere(vk::CommandBuffer cmd_buf)
   cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.getVkPipeline());
 
   auto& lights = sceneMgr->getLights();
-  for(std::size_t i = 1; i < lights.size(); ++i) {
-    const float dist = glm::length(glm::vec3(worldViewProj * glm::vec4(lights[i].position.x, lights[i].position.y, lights[i].position.z, 1)));
+  for(const auto& light : lights) {
+    const float dist = glm::length(glm::vec3(worldViewProj * glm::vec4(light.position.x, light.position.y, light.position.z, 1)));
     const float fovCorrection = glm::length(glm::vec3(worldViewProj[0]));
-    uint32_t n = static_cast<uint32_t>((500.f * fovCorrection * lights[i].visibleRadius / dist)) + 1;
+    uint32_t n = static_cast<uint32_t>((5000.f * fovCorrection * light.visibleRadius / dist));
+    if (n < 4) {
+      continue;
+    }
     n = std::min(n, 128u);
-    struct {glm::mat4x4 pv; glm::vec4 pos, color; float degree;} pushConstants{worldViewProj, lights[i].position, lights[i].color, M_PIf / n};
-    pushConstants.pos.w = lights[i].visibleRadius;
+    struct {glm::mat4x4 pv; glm::vec4 pos, color; float degree;} pushConstants{worldViewProj, light.position, light.colorRange, M_PIf / n};
+    pushConstants.pos.w = light.visibleRadius;
     cmd_buf.pushConstants(
       pipeline.getVkPipelineLayout(), 
       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,

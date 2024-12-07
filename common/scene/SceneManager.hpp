@@ -8,6 +8,9 @@
 #include <etna/BlockingTransferHelper.hpp>
 #include <etna/VertexInput.hpp>
 
+#include "LightSource.hpp"
+#include "Material.hpp"
+#include "scene/ResourceManager.hpp"
 
 // A single render element (relem) corresponds to a single draw call
 // of a certain pipeline with specific bindings (including material data)
@@ -16,8 +19,7 @@ struct RenderElement
   std::uint32_t vertexOffset;
   std::uint32_t indexOffset;
   std::uint32_t indexCount;
-  // Not implemented!
-  // Material* material;
+  Material::Id materialId;
 };
 
 
@@ -56,17 +58,23 @@ public:
 
   etna::VertexByteStreamFormatDescription getVertexFormatDescription();
 
-  struct LightSource {
-    glm::vec4 position;
-    glm::vec4 color;
-    float visibleRadius = 0.f;
-  };
+  const auto& getLights() const { return lightSources; }
 
-  const std::vector<LightSource>& getLights() const { return lightSources; }
+  const auto& operator[](Material   ::Id id) const { return    materials[id]; }
+  const auto& operator[](LightSource::Id id) const { return lightSources[id]; }
+  const auto& operator[](Texture    ::Id id) const { return     textures[id]; }
 
+  const auto& get(Material   ::Id id) const { return    materials[id]; }
+  const auto& get(LightSource::Id id) const { return lightSources[id]; }
+  const auto& get(Texture    ::Id id) const { return     textures[id]; }
+  
+  Material::Id getStubMaterial();
+  Texture::Id getStubTexture();
+  Texture::Id getStubRedTexture();
 private:
 
   std::optional<tinygltf::Model> loadModel(std::filesystem::path path);
+
 
   struct ProcessedInstances
   {
@@ -75,6 +83,12 @@ private:
   };
 
   ProcessedInstances processInstances(const tinygltf::Model& model) const;
+  void loadModelResources(std::filesystem::path, const tinygltf::Model& model);
+  
+  //! Must be after loading resources
+  void processMaterials(const tinygltf::Model& model);
+
+  
 
   struct Vertex
   {
@@ -82,9 +96,10 @@ private:
     glm::vec4 positionAndNormal;
     // First 2 floats are tex coords, 3rd is a packed tangent, 4th is padding
     glm::vec4 texCoordAndTangentAndPadding;
+    glm::vec4 normTexCoord;
   };
 
-  static_assert(sizeof(Vertex) == sizeof(float) * 8);
+  static_assert(sizeof(Vertex) == sizeof(float) * 12);
   static glm::mat2x3 getBounds(std::span<const Vertex>);
 
   struct ProcessedMeshes
@@ -106,6 +121,7 @@ private:
   std::unique_ptr<etna::OneShotCmdMgr> oneShotCommands;
   etna::BlockingTransferHelper transferHelper;
 
+  
   std::vector<RenderElement> renderElements;
   std::vector<Mesh> meshes;
   std::vector<glm::mat4x4> instanceMatrices;
@@ -115,5 +131,11 @@ private:
   etna::Buffer unifiedVbuf;
   etna::Buffer unifiedIbuf;
 
-  std::vector<LightSource> lightSources;
+  ResourceManager<LightSource> lightSources;
+
+  ResourceManager<Material> materials;
+  ResourceManager<Texture > textures;
+  Texture::Id stubTexture = Texture::Id::Invalid;
+  Texture::Id stubRedTexture = Texture::Id::Invalid;
+  Material::Id stubMaterial = Material::Id::Invalid;
 };

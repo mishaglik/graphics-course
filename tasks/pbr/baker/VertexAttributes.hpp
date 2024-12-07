@@ -15,9 +15,12 @@ struct VertexAttrs {
     uint32_t tangent;
 
     std::byte _pad2[4];
+    glm::vec2 normTexCoord;
+    std::byte _pad3[8];
+
 };
 
-static_assert(sizeof(VertexAttrs) == 32);
+static_assert(sizeof(VertexAttrs) == 48);
 static_assert(offsetof(VertexAttrs, cord) == 0);
 static_assert(offsetof(VertexAttrs, norm) == 12);
 static_assert(offsetof(VertexAttrs, texture) == 16);

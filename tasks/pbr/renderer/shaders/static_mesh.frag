@@ -2,22 +2,32 @@
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_GOOGLE_include_directive : require
 
-
 layout(location = 0) out vec4 out_fragColor;
 layout(location = 1) out vec4 out_fragNormal;
+layout(location = 2) out vec4 out_fragMaterial;
 
 layout(location = 0) in VS_OUT
 {
   vec3 wPos;
-  vec3 wNorm;
-  vec3 wTangent;
+  vec4 wNorm;
+  vec4 wTangent;
   vec2 texCoord;
+  vec2 normTexCoord;
 } surf;
+
+layout (std140, set = 0, binding = 0) readonly buffer ims_t {
+  mat4 mModels[]; 
+} ims;
+layout(set = 1, binding = 0) uniform sampler2D baseColorTexture;
+layout(set = 1, binding = 1) uniform sampler2D    normalTexture;
+layout(set = 1, binding = 2) uniform sampler2D      emr_Texture;
 
 layout(push_constant) uniform params_t
 {
   mat4 mProjView;
   mat4 mModel;
+  vec4 color;
+  vec4 emr_;
   uint relemIdx;
 } params;
 
@@ -34,8 +44,11 @@ vec3 getPos() {
 
 void main()
 {
-  out_fragColor = vec4(1., 1., 1., 0) * 0.3;
-  out_fragNormal.rgb = surf.wNorm;
-  out_fragNormal.w = gl_FragCoord.w;
+  out_fragColor = texture(baseColorTexture, surf.texCoord) * params.color;
+  vec3 bitangent = cross(surf.wNorm.xyz, surf.wTangent.xyz) * surf.wTangent.w;
+  vec4 normalMap = texture(normalTexture, surf.normTexCoord); 
 
+  out_fragNormal.xyz = normalize(surf.wNorm.xyz * normalMap.r + surf.wTangent.xyz * normalMap.g + bitangent * normalMap.z);
+  out_fragNormal.w = gl_FragCoord.w;
+  out_fragMaterial = params.emr_ * texture(emr_Texture, surf.normTexCoord);
 }

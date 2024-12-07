@@ -7,11 +7,14 @@
 
 layout(location = 0) in vec4 vPosNorm;
 layout(location = 1) in vec4 vTexCoordAndTang;
+layout(location = 2) in vec4 vNormTexCoord;
 
 layout(push_constant) uniform params_t
 {
   mat4 mProjView;
   mat4 mModel;
+  vec4 color;
+  vec4 emr_;
   uint relemIdx;
 } params;
 
@@ -19,14 +22,17 @@ layout(push_constant) uniform params_t
 layout (location = 0 ) out VS_OUT
 {
   vec3 wPos;
-  vec3 wNorm;
-  vec3 wTangent;
+  vec4 wNorm;
+  vec4 wTangent;
   vec2 texCoord;
+  vec2 normTexCoord;
 } vOut;
 
 layout (std140, set = 0, binding = 0) readonly buffer ims_t {
   mat4 mModels[]; 
 } ims;
+layout(set = 1, binding = 0) uniform sampler2D baseColorTexture;
+layout(set = 1, binding = 1) uniform sampler2D    normalTexture;
 
 out gl_PerVertex { vec4 gl_Position; };
 
@@ -37,9 +43,13 @@ void main(void)
   const vec4 wTang = vec4(decode_normal(floatBitsToInt(vTexCoordAndTang.z)), 0.0f);
 
   vOut.wPos   = (ims.mModels[gl_InstanceIndex] * vec4(vPosNorm.xyz, 1.0f)).xyz;
-  vOut.wNorm  = normalize(mat3(transpose(inverse(ims.mModels[gl_InstanceIndex]))) * wNorm.xyz);
-  vOut.wTangent = normalize(mat3(transpose(inverse(ims.mModels[gl_InstanceIndex]))) * wTang.xyz);
+  mat3 invModel = mat3(transpose(inverse(ims.mModels[gl_InstanceIndex])));
+  vOut.wNorm.xyz    = normalize(invModel * wNorm.xyz);
+  vOut.wTangent.xyz = normalize(invModel * wTang.xyz);
+  vOut.wNorm.w = 1;
+  vOut.wTangent.w = 1;
   vOut.texCoord = vTexCoordAndTang.xy;
+  vOut.normTexCoord = vNormTexCoord.xy;
 
   gl_Position   = params.mProjView * vec4(vOut.wPos, 1.0);
 }

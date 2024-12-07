@@ -12,7 +12,8 @@ layout (location = 0 ) in VS_OUT
 
 layout(binding = 0) uniform sampler2D albedo;
 layout(binding = 1) uniform sampler2D normal;
-layout(binding = 2) uniform sampler2D depth;
+layout(binding = 2) uniform sampler2D material;
+layout(binding = 3) uniform sampler2D depth;
 
 layout(push_constant) uniform pc_t
 {
@@ -53,7 +54,7 @@ void main(void)
   const vec3 lightDir = getPos(depth, wc) - surf.lightSrc.xyz;
   const float dist = length(lightDir);
   if (dist - surf.lightSrc.w < 0.00) {
-    out_fragColor.rgb = getLight(surf.lightDir, normal, params.color.rgb).rgb * surfaceColor;
+    out_fragColor.rgb = getLight(surf.lightDir, normal, params.color.rgb).rgb * surfaceColor * texture(material, texCoord).g;
     out_fragColor.a = max(sin(3.14 * (1 - dist / surf.lightSrc.w)), 0);
   }
 }

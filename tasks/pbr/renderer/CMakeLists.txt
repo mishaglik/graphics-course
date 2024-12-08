@@ -26,5 +26,7 @@ target_add_shaders(pbr_renderer
   shaders/deferred.frag
   shaders/sphere.vert
   shaders/sphere.frag
+  shaders/skybox.vert
+  shaders/skybox.frag
   shaders/sphere_deferred.frag
 )

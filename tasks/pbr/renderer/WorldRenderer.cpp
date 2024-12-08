@@ -5,6 +5,7 @@
 #include <etna/RenderTargetStates.hpp>
 #include <etna/Profiling.hpp>
 #include <glm/ext.hpp>
+#include "stb_image.h"
 
 const std::size_t N_MAX_INSTANCES = 1 << 14;
 const vk::Format BACKBUFFER_FORMAT = vk::Format::eB10G11R11UfloatPack32;
@@ -58,6 +59,7 @@ void WorldRenderer::allocateResources(glm::uvec2 swapchain_resolution)
     heightmap.upscale(*ctx.createOneShotCmdMgr());
 
   allocateGBuffer();
+  loadSkybox();
 }
 
 void WorldRenderer::allocateGBuffer() {
@@ -123,6 +125,34 @@ void WorldRenderer::allocateGBuffer() {
   };
 }
 
+void WorldRenderer::loadSkybox() {
+  auto& ctx = etna::get_context();
+
+
+  skybox = ctx.createImage({
+    .extent = vk::Extent3D{2048, 2048, 1},
+    .name = "skybox",
+    .format = vk::Format::eB8G8R8A8Srgb,
+    .imageUsage = vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+    .layers = 6,
+    .flags = vk::ImageCreateFlagBits::eCubeCompatible,
+  });
+  
+  for(size_t i = 0; i < 6; ++i) {
+    int width, height, nChans;
+    auto* imageBytes = stbi_load((GRAPHICS_COURSE_RESOURCES_ROOT "/textures/sb-" + std::to_string(i) + ".jpg").c_str(), &width, &height, &nChans, STBI_rgb_alpha);
+    if (imageBytes == nullptr)
+    {
+      spdlog::log(spdlog::level::err, "Skybox load is unsuccessful");
+      return;
+    }
+    size_t size = static_cast<std::size_t>(width * height * 4);
+    etna::BlockingTransferHelper bth({.stagingSize = size});
+    
+    bth.uploadImage(*ctx.createOneShotCmdMgr(), skybox, 0, i, std::span<const std::byte>(reinterpret_cast<const std::byte*>(imageBytes), size));
+
+  }
+}
 
 void WorldRenderer::loadScene(std::filesystem::path path)
 {
@@ -180,6 +210,12 @@ void WorldRenderer::loadShaders()
     "deferred_shader",
     {PBR_RENDERER_SHADERS_ROOT "deferred.vert.spv",
      PBR_RENDERER_SHADERS_ROOT "deferred.frag.spv"}
+  );
+
+  etna::create_program(
+    "skybox_shader",
+    {PBR_RENDERER_SHADERS_ROOT "skybox.vert.spv",
+     PBR_RENDERER_SHADERS_ROOT "skybox.frag.spv"}
   );
 
   etna::create_program(
@@ -338,6 +374,21 @@ void WorldRenderer::setupPipelines(vk::Format swapchain_format)
         },
     });
 
+    skyboxPipeline = pipelineManager.createGraphicsPipeline(
+    "skybox_shader",
+    etna::GraphicsPipeline::CreateInfo{
+      .depthConfig = {
+        .depthTestEnable = vk::True,
+        .depthWriteEnable = vk::True,
+        .depthCompareOp = vk::CompareOp::eLessOrEqual,
+        .maxDepthBounds = 1.f,
+      },
+      .fragmentShaderOutput =
+        {
+          .colorAttachmentFormats = {BACKBUFFER_FORMAT},
+          .depthAttachmentFormat = gBuffer.back().getFormat(),
+        },
+    });
 
     deferredLightPipeline = pipelineManager.createGraphicsPipeline(
     "deferred_shader",
@@ -925,6 +976,8 @@ void WorldRenderer::tonemapEvaluate(vk::CommandBuffer cmd_buf)
   }
 }
 
+
+
 void WorldRenderer::renderLights(vk::CommandBuffer cmd_buf)
 {
   ETNA_PROFILE_GPU(cmd_buf, renderLights);
@@ -954,7 +1007,7 @@ void WorldRenderer::renderLights(vk::CommandBuffer cmd_buf)
       vk::ImageAspectFlagBits::eDepth
     );
   etna::flush_barriers(cmd_buf);
-   {
+  {
     etna::RenderTargetState renderTargets(
       cmd_buf,
       {{0, 0}, {resolution.x, resolution.y}},
@@ -999,8 +1052,9 @@ void WorldRenderer::renderLights(vk::CommandBuffer cmd_buf)
 
     cmd_buf.draw(3, 1, 0, 0);
   }
-  renderSphereDeferred(cmd_buf);
-  renderSphere(cmd_buf);
+  // renderSphereDeferred(cmd_buf);
+  renderSkybox(cmd_buf);
+  // renderSphere(cmd_buf);
 }
 
 namespace {
@@ -1181,6 +1235,14 @@ void WorldRenderer::renderSphereDeferred(vk::CommandBuffer cmd_buf)
 void WorldRenderer::renderSphere(vk::CommandBuffer cmd_buf)
 {
   ETNA_PROFILE_GPU(cmd_buf, renderSphere);
+  etna::set_state(cmd_buf, 
+    gBuffer.back().get(), 
+    vk::PipelineStageFlagBits2::eFragmentShader | vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests, 
+    vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eDepthStencilAttachmentRead, 
+    vk::ImageLayout::eDepthReadOnlyStencilAttachmentOptimal, 
+    vk::ImageAspectFlagBits::eDepth
+  );
+  etna::flush_barriers(cmd_buf);
   CustomRenderTargetState renderTargets(
     cmd_buf,
     {{0, 0}, {resolution.x, resolution.y}},
@@ -1212,5 +1274,57 @@ void WorldRenderer::renderSphere(vk::CommandBuffer cmd_buf)
     );
 
     cmd_buf.draw(2 * n + 2, n, 0, 0);
+  }
+}
+
+void WorldRenderer::renderSkybox(vk::CommandBuffer cmd_buf) {
+  ETNA_PROFILE_GPU(cmd_buf, renderSkybox);
+  {
+    etna::set_state(cmd_buf, 
+      gBuffer.back().get(), 
+      vk::PipelineStageFlagBits2::eFragmentShader | vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests, 
+      vk::AccessFlagBits2::eDepthStencilAttachmentRead | vk::AccessFlagBits2::eDepthStencilAttachmentWrite, 
+      vk::ImageLayout::eDepthStencilAttachmentOptimal, 
+      vk::ImageAspectFlagBits::eDepth
+    );
+    etna::flush_barriers(cmd_buf);
+    CustomRenderTargetState renderTargets(
+      cmd_buf,
+      {{0, 0}, {resolution.x, resolution.y}},
+      {{.image = backbuffer.get(), .view = backbuffer.getView({}), .loadOp = vk::AttachmentLoadOp::eLoad,}},
+      {.image = gBuffer.back().get(), .view = gBuffer.back().getView({}), .loadOp = vk::AttachmentLoadOp::eLoad, .storeOp = vk::AttachmentStoreOp::eStore, .layout=vk::ImageLayout::eDepthStencilAttachmentOptimal},
+      {}
+    );
+
+    auto skyboxShader = etna::get_shader_program("skybox_shader");
+    auto& pipeline = skyboxPipeline;
+
+    cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.getVkPipeline());
+
+    auto set = etna::create_descriptor_set(
+      skyboxShader.getDescriptorLayoutId(0),
+      cmd_buf,
+      {
+        etna::Binding{0, skybox.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal, {.layerCount=6, .type=vk::ImageViewType::eCube})}
+      }
+    );
+    
+    cmd_buf.bindDescriptorSets(
+      vk::PipelineBindPoint::eGraphics,
+      pipeline.getVkPipelineLayout(),
+      0,
+      {set.getVkSet()},
+      {}
+    );
+
+    cmd_buf.pushConstants(
+      pipeline.getVkPipelineLayout(), 
+      vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eVertex,
+      0,
+      uint32_t(sizeof(worldViewProj)),
+      &worldViewProj
+    );
+
+    cmd_buf.draw(6, 6, 0, 0);
   }
 }

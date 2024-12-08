@@ -53,8 +53,8 @@ void main(void)
   const vec4 mat = texture(material, surf.texCoord);
   // Only sunlight. Other are in sphere_deferred;
   //const vec3 lightPos = params.position.xyz;
-  const vec3 lightPos = vec3(0, 1000, 0);
-  out_fragColor = getLight((params.mProjView * vec4(params.position.xyz, 1)).xyz, pos, normal, params.color.rgb, surfaceColor, mat);
+  const vec3 lightPos =  vec3(-15, 10, -20);
+  out_fragColor = getLight((params.mProjView * vec4(lightPos, 1)).xyz, pos, normal, params.color.rgb, surfaceColor, mat);
   //out_fragColor.rgb *= surfaceColor;
 }
 

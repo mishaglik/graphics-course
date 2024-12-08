@@ -24,6 +24,8 @@ public:
   void loadShaders();
   void allocateResources(glm::uvec2 swapchain_resolution);
   void allocateGBuffer();
+  
+  void loadSkybox();
 
   void setupPipelines(vk::Format swapchain_format);
 
@@ -42,6 +44,7 @@ private:
   void renderPostprocess(
     vk::CommandBuffer cmd_buf, vk::Image target_image, vk::ImageView target_image_view);
 
+  void renderSkybox(vk::CommandBuffer cmd_buf);
   void renderLights(vk::CommandBuffer cmd_buf);
   
   void renderSphereDeferred(vk::CommandBuffer cmd_buf);
@@ -94,6 +97,7 @@ private:
   etna::ComputePipeline histogramPipeline{};
   etna::ComputePipeline distributionPipeline{};
 
+  etna::GraphicsPipeline skyboxPipeline{};
   etna::GraphicsPipeline deferredLightPipeline{};
   etna::GraphicsPipeline sphereDeferredPipeline{};
   etna::GraphicsPipeline spherePipeline{};
@@ -101,6 +105,8 @@ private:
   etna::GraphicsPipeline postprocessPipeline{};
   etna::Sampler defaultSampler;
   glm::uvec2 resolution;
+
+  etna::Image skybox;
 
   struct RenderGroup {
     RenderElement re;

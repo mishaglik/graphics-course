@@ -1052,9 +1052,9 @@ void WorldRenderer::renderLights(vk::CommandBuffer cmd_buf)
 
     cmd_buf.draw(3, 1, 0, 0);
   }
-  // renderSphereDeferred(cmd_buf);
+  renderSphereDeferred(cmd_buf);
   renderSkybox(cmd_buf);
-  // renderSphere(cmd_buf);
+  renderSphere(cmd_buf);
 }
 
 namespace {

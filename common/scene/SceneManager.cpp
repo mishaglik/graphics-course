@@ -570,6 +570,10 @@ etna::VertexByteStreamFormatDescription SceneManager::getVertexFormatDescription
         .format = vk::Format::eR32G32B32A32Sfloat,
         .offset = sizeof(glm::vec4),
       },
+      etna::VertexByteStreamFormatDescription::Attribute{
+        .format = vk::Format::eR32G32B32A32Sfloat,
+        .offset = 2 * sizeof(glm::vec4),
+      },
     }};
 }
 

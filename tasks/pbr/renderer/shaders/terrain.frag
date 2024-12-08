@@ -39,7 +39,7 @@ vec4 heightMaterial(float height)
   if(height < 14.01)
     return vec4(0, 0.5,   0, 1);
   if(height < 14.1)
-    return vec4(0, 0.5, 0.5, 1);
+    return vec4(0, 0.5,   0, 1);
 
   return vec4(0, 0.5, 0, 1);
 }
@@ -48,8 +48,8 @@ void main(void)
 {
   //out_fragColor = fract(surf.texCoord.x * 64.) < 0.5 ? vec4(1., 0., 0., 0) : vec4(0., 1., 0., 0);
   //out_fragColor = vec4(gl_FragCoord.z, depthToDist(gl_FragCoord.z) / far, 1., 0);
+  
   out_fragColor.rgb = heightColor(surf.height);
   out_fragNormal = vec4(surf.normal.rgb, gl_FragCoord.w);
   out_fragMaterial  = heightMaterial(surf.height);
-
 }

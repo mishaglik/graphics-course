@@ -2,6 +2,8 @@
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_GOOGLE_include_directive : require
 
+#include "pbr.glsl"
+
 layout(location = 0) out vec4 out_fragColor;
 
 layout (location = 0 ) in VS_OUT
@@ -31,18 +33,16 @@ vec3 getPos(float depth, float wc) {
   ) / wc;
 }
 
-vec4 getLight(vec3 lightPos, vec3 pos, vec3 normal, vec3 lightColor)
+vec4 getLight(vec3 lightPos, vec3 pos, vec3 normal, vec3 lightColor, vec3 surfaceColor, vec4 material)
 {
   const vec3 lightDir   = normalize(lightPos - pos);
-  const vec3 diffuse = max(dot(normal, lightDir), 0.0f) * lightColor;
-  const float ambient = 0.05;
-  return vec4( (diffuse + ambient), 1.f);
+  return vec4(pbr_light(surfaceColor, pos, normal, lightDir, material), 1.f);
+  //return vec4(surfaceColor, 1) * 0.05;
 }
 
 void main(void)
 {
   const vec3 surfaceColor = texture(albedo, surf.texCoord).rgb;
-
 
   const vec4 normal_wc = texture(normal, surf.texCoord);
   const mat3 ipv3 = transpose(inverse(mat3(params.mProjView)));
@@ -50,8 +50,11 @@ void main(void)
   const float wc    = normal_wc.w;
   const float depthV = texture(depth, surf.texCoord).w;
   const vec3 pos = getPos(depthV, wc);
+  const vec4 mat = texture(material, surf.texCoord);
   // Only sunlight. Other are in sphere_deferred;
-  out_fragColor = getLight((params.mProjView * vec4(params.position.xyz, 1)).xyz, pos, normal, params.color.rgb);
-  out_fragColor.rgb *= surfaceColor;
+  //const vec3 lightPos = params.position.xyz;
+  const vec3 lightPos = vec3(0, 1000, 0);
+  out_fragColor = getLight((params.mProjView * vec4(params.position.xyz, 1)).xyz, pos, normal, params.color.rgb, surfaceColor, mat);
+  //out_fragColor.rgb *= surfaceColor;
 }
 

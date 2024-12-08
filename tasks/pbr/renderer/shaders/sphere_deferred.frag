@@ -1,7 +1,7 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_GOOGLE_include_directive : require
-
+#include "pbr.glsl"
 layout(location = 0) out vec4 out_fragColor;
 
 layout (location = 0 ) in VS_OUT
@@ -33,10 +33,9 @@ vec3 getPos(float depth, float wc) {
   ) / wc;
 }
 
-vec4 getLight(vec3 lightDir, vec3 normal, vec3 lightColor)
+vec4 getLight(vec3 pos, vec3 normal, vec3 lightColor, vec3 surfaceColor, vec4 material)
 {
-  const vec3 diffuse = max(dot(normal, normalize(-lightDir)), 0.0f) * lightColor;
-  return vec4(diffuse, 0);
+  return vec4(pbr_light(surfaceColor, pos, normal, -surf.lightDir, material) * lightColor, 1.f);
 }
 
 void main(void)
@@ -53,9 +52,8 @@ void main(void)
   const float depth = texture(depth, texCoord).w;
   const vec3 lightDir = getPos(depth, wc) - surf.lightSrc.xyz;
   const float dist = length(lightDir);
-  if (dist - surf.lightSrc.w < 0.00) {
-    out_fragColor.rgb = getLight(surf.lightDir, normal, params.color.rgb).rgb * surfaceColor * texture(material, texCoord).g;
+  if (dot(normalize(lightDir), normal) < 0) {
+    out_fragColor.rgb = getLight(getPos(depth, wc), normal, params.color.rgb, surfaceColor, texture(material, texCoord)).rgb;
     out_fragColor.a = max(sin(3.14 * (1 - dist / surf.lightSrc.w)), 0);
   }
 }
-

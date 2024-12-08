@@ -27,5 +27,5 @@ void main() {
   vOut.lightSrc.xyz = (params.mProjView * vec4(params.pos.xyz, 1)).xyz;
  
   vOut.lightDir = normalize(gl_Position.xyz - vOut.lightSrc.xyz);
-  vOut.lightSrc.w = length(gl_Position.xyz - vOut.lightSrc.xyz);
+  vOut.lightSrc.w = 2 * length(gl_Position.xyz - vOut.lightSrc.xyz);
 }

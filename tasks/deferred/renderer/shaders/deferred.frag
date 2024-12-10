@@ -11,7 +11,8 @@ layout (location = 0 ) in VS_OUT
 
 layout(binding = 0) uniform sampler2D albedo;
 layout(binding = 1) uniform sampler2D normal;
-layout(binding = 2) uniform sampler2D  depth;
+layout(binding = 2) uniform sampler2D     wc;
+layout(binding = 3) uniform sampler2D  depth;
 
 layout(push_constant) uniform pc_t
 {
@@ -40,18 +41,18 @@ vec4 getLight(vec3 lightPos, vec3 pos, vec3 normal, vec3 lightColor)
 
 void main(void)
 {
-  const vec3 surfaceColor = texture(albedo, surf.texCoord).rgb;
+  const vec2 texCoord = gl_FragCoord.xy / resolution;
+  const vec3 surfaceColor = texture(albedo, texCoord).rgb;
 
-
-  const vec4 normal_wc = texture(normal, surf.texCoord);
+  const vec4 normal_wc = texture(normal, texCoord);
   const mat3 ipv3 = transpose(inverse(mat3(params.mProjView)));
   const vec3 normal = normalize(ipv3 * normal_wc.xyz);
-  const float wc    = normal_wc.w;
-  const float depthV = texture(depth, surf.texCoord).w;
+  const float depthV = texture(depth, texCoord).r;
+  const float wc     = texture(wc,    texCoord).r;
+  
   const vec3 pos = getPos(depthV, wc);
   // Only sunlight. Other are in sphere_deferred;
   out_fragColor = getLight((params.mProjView * vec4(params.position.xyz, 1)).xyz, pos, normal, params.color.rgb);
   out_fragColor.rgb *= surfaceColor;
-
 }
 

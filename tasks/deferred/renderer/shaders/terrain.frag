@@ -4,6 +4,7 @@
 
 layout(location = 0) out vec4 out_fragColor;
 layout(location = 1) out vec4 out_fragNormal;
+layout(location = 2) out float out_fragWc;
 
 layout (location = 0) in VS_OUT
 {
@@ -37,6 +38,6 @@ void main(void)
   //out_fragColor = vec4(gl_FragCoord.z, depthToDist(gl_FragCoord.z) / far, 1., 0);
   out_fragColor.rgb = heightColor(surf.height);
 
-  out_fragNormal = vec4(surf.normal.rgb, gl_FragCoord.w);
-
+  out_fragNormal = vec4(surf.normal.rgb, 0);
+  out_fragWc = gl_FragCoord.w;
 }

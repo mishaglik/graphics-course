@@ -30,7 +30,7 @@ void Renderer::initVulkan(std::span<const char*> instance_extensions)
     .deviceExtensions = deviceExtensions,
     .features = vk::PhysicalDeviceFeatures2{.features = {.tessellationShader=1, .fillModeNonSolid=1}},
     .physicalDeviceIndexOverride = {},
-    .numFramesInFlight = 2,
+    .numFramesInFlight = 1,
   });
 }
 

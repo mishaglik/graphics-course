@@ -63,7 +63,8 @@ void WorldRenderer::allocateResources(glm::uvec2 swapchain_resolution)
 void WorldRenderer::allocateGBuffer() {
   auto& albedo = gBuffer[0];
   auto& normal = gBuffer[1];
-  auto& depth  = gBuffer[2];
+  auto& wc     = gBuffer[2];
+  auto& depth  = gBuffer[3];
 
   auto& ctx = etna::get_context(); 
 
@@ -78,6 +79,13 @@ void WorldRenderer::allocateGBuffer() {
     .extent = vk::Extent3D{resolution.x, resolution.y, 1},
     .name = "gBuffer_normal",
     .format = vk::Format::eR16G16B16A16Snorm,
+    .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+  });
+
+  wc = ctx.createImage({
+    .extent = vk::Extent3D{resolution.x, resolution.y, 1},
+    .name = "gBuffer_wc",
+    .format = vk::Format::eR32Sfloat,
     .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
   });
 
@@ -97,6 +105,11 @@ void WorldRenderer::allocateGBuffer() {
     etna::RenderTargetState::AttachmentParams {
       .image = normal.get(),
       .view  = normal.getView({}),
+      .imageAspect = vk::ImageAspectFlagBits::eColor,
+    },
+    etna::RenderTargetState::AttachmentParams {
+      .image = wc.get(),
+      .view  = wc.getView({}),
       .imageAspect = vk::ImageAspectFlagBits::eColor,
     },
   };
@@ -215,6 +228,11 @@ void WorldRenderer::setupPipelines(vk::Format swapchain_format)
             .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
               vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
           },
+          vk::PipelineColorBlendAttachmentState{
+            .blendEnable = vk::False,
+            .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+              vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
+          },
         },
         .logicOpEnable = false,
         .logicOp = {},
@@ -225,6 +243,7 @@ void WorldRenderer::setupPipelines(vk::Format swapchain_format)
           .colorAttachmentFormats = {
             gBuffer[0].getFormat(), /*albedo*/
             gBuffer[1].getFormat(), /*normal*/
+            gBuffer[2].getFormat(), /*wc*/
           },
           .depthAttachmentFormat = gBuffer.back().getFormat(),
         },
@@ -250,6 +269,11 @@ void WorldRenderer::setupPipelines(vk::Format swapchain_format)
             .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
               vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
           },
+          vk::PipelineColorBlendAttachmentState{
+            .blendEnable = vk::False,
+            .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+              vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
+          },
         },
         .logicOpEnable = false,
         .logicOp = {},
@@ -261,6 +285,7 @@ void WorldRenderer::setupPipelines(vk::Format swapchain_format)
         .colorAttachmentFormats = {
           gBuffer[0].getFormat(), /*albedo*/
           gBuffer[1].getFormat(), /*normal*/
+          gBuffer[2].getFormat(), /*wc*/
         },
         .depthAttachmentFormat = gBuffer.back().getFormat(),
       },
@@ -289,6 +314,11 @@ void WorldRenderer::setupPipelines(vk::Format swapchain_format)
             .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
               vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
           },
+          vk::PipelineColorBlendAttachmentState{
+            .blendEnable = vk::False,
+            .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+              vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
+          },
         },
         .logicOpEnable = false,
         .logicOp = {},
@@ -299,6 +329,7 @@ void WorldRenderer::setupPipelines(vk::Format swapchain_format)
           .colorAttachmentFormats = {
             gBuffer[0].getFormat(), /*albedo*/
             gBuffer[1].getFormat(), /*normal*/
+            gBuffer[2].getFormat(), /*wc*/
           },
           .depthAttachmentFormat = gBuffer.back().getFormat(),
         },
@@ -458,7 +489,7 @@ void WorldRenderer::renderScene(
     {});
 
 
-  pushConst2M.projView = glob_tm;
+  pushConst2M.projView = worldViewProj;
 
   auto relems = sceneMgr->getRenderElements();
   std::size_t firstInstance = 0;
@@ -607,7 +638,7 @@ void WorldRenderer::renderTerrain(
   const float step = 2.f / nChunks;
 
   pushConstantsTerrain.extent = {step, step};
-  pushConstantsTerrain.mat  = pushConst2M.projView;
+  pushConstantsTerrain.mat  = worldViewProj;
   pushConstantsTerrain.degree = 256;
   for (size_t x = 0; x < nChunks; ++x) {
     for (size_t y = 0; y < nChunks; ++y) {
@@ -677,6 +708,7 @@ void WorldRenderer::renderWorld(
 
 static bool IsVisble(const glm::mat2x3 bounds, const glm::mat4x4& transform)
 {
+  return true;
   glm::vec4 origin = glm::vec4(bounds[0], 1.f);
   glm::mat4x4 corners[2] = {
     {
@@ -941,9 +973,10 @@ void WorldRenderer::renderLights(vk::CommandBuffer cmd_buf)
         etna::Binding{0, gBuffer[0].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
         etna::Binding{1, gBuffer[1].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
         etna::Binding{2, gBuffer[2].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+        etna::Binding{3, gBuffer[3].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
       }
     );
-    assert(gBuffer.size() == 3);
+    assert(gBuffer.size() == 4);
     
     cmd_buf.bindDescriptorSets(
       vk::PipelineBindPoint::eGraphics,
@@ -952,7 +985,11 @@ void WorldRenderer::renderLights(vk::CommandBuffer cmd_buf)
       {set.getVkSet()},
       {}
     );
-
+    // spdlog::info("WPV: ");
+    // spdlog::info("{{{}, {}, {}, {}}}", worldViewProj[0][0], worldViewProj[1][0], worldViewProj[2][0], worldViewProj[3][0]);
+    // spdlog::info("{{{}, {}, {}, {}}}", worldViewProj[0][1], worldViewProj[1][1], worldViewProj[2][1], worldViewProj[3][1]);
+    // spdlog::info("{{{}, {}, {}, {}}}", worldViewProj[0][2], worldViewProj[1][2], worldViewProj[2][2], worldViewProj[3][2]);
+    // spdlog::info("{{{}, {}, {}, {}}}", worldViewProj[0][3], worldViewProj[1][3], worldViewProj[2][3], worldViewProj[3][3]);
     struct {glm::mat4x4 pv; glm::vec4 pos, color;} pushConstants{worldViewProj, sceneMgr->getLights()[0].position, sceneMgr->getLights()[0].color};
 
     cmd_buf.pushConstants(
@@ -1108,10 +1145,11 @@ void WorldRenderer::renderSphereDeferred(vk::CommandBuffer cmd_buf)
       {
         etna::Binding{0, gBuffer[0].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
         etna::Binding{1, gBuffer[1].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
-        etna::Binding{2, gBuffer[2].genBinding(defaultSampler.get(), vk::ImageLayout::eDepthReadOnlyStencilAttachmentOptimal)},
+        etna::Binding{2, gBuffer[2].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+        etna::Binding{3, gBuffer[3].genBinding(defaultSampler.get(), vk::ImageLayout::eDepthReadOnlyStencilAttachmentOptimal)},
       }
     );
-    assert(gBuffer.size() == 3);
+    assert(gBuffer.size() == 4);
     
     cmd_buf.bindDescriptorSets(
       vk::PipelineBindPoint::eGraphics,

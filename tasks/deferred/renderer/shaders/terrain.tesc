@@ -31,10 +31,10 @@ void main()
 
     if (gl_InvocationID == 0)
     {
-        gl_TessLevelOuter[0] = tscoef / pow(dists.x + dists.y, 2.5);
-        gl_TessLevelOuter[1] = tscoef / pow(dists.y + dists.z, 2.5);
-        gl_TessLevelOuter[2] = tscoef / pow(dists.z + dists.w, 2.5);
-        gl_TessLevelOuter[3] = tscoef / pow(dists.w + dists.x, 2.5);
+        gl_TessLevelOuter[0] = tscoef / pow(dists.x + dists.z, 2.5);
+        gl_TessLevelOuter[1] = tscoef / pow(dists.x + dists.y, 2.5);
+        gl_TessLevelOuter[2] = tscoef / pow(dists.y + dists.w, 2.5);
+        gl_TessLevelOuter[3] = tscoef / pow(dists.z + dists.w, 2.5);
 
         gl_TessLevelInner[0] = gl_TessLevelOuter[0] + gl_TessLevelOuter[2];
         gl_TessLevelInner[1] = gl_TessLevelOuter[1] + gl_TessLevelOuter[3];

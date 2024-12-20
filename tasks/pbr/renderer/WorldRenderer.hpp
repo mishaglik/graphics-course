@@ -61,7 +61,7 @@ private:
 
   etna::Image backbuffer;
 
-  std::array<etna::Image, 4> gBuffer;
+  std::array<etna::Image, 5> gBuffer;
   std::vector<etna::RenderTargetState::AttachmentParams> gBufferColorAttachments;
   etna::RenderTargetState::AttachmentParams gBufferDepthAttachment;
 

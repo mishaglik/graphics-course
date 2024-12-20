@@ -44,9 +44,9 @@ std::optional<tinygltf::Model> load_model(std::filesystem::path path)
 
   auto ext = path.extension();
   if (ext == ".gltf")
-    success = loader.LoadASCIIFromFile(&model, &error, &warning, path.string());
+    success = loader.LoadASCIIFromFile(&model, &error, &warning, path.generic_string<char>());
   else if (ext == ".glb")
-    success = loader.LoadBinaryFromFile(&model, &error, &warning, path.string());
+    success = loader.LoadBinaryFromFile(&model, &error, &warning, path.generic_string<char>());
   else
   {
     spdlog::error("glTF: Unknown glTF file extension: '{}'. Expected .gltf or .glb.", ext);
@@ -321,8 +321,8 @@ void append_model(tinygltf::Model& model, BakeResult& baked, Path dest)
   
   {
     tinygltf::Buffer buffer{};
-    buffer.name = dest.stem();
-    buffer.uri = dest.filename();
+    buffer.name = dest.stem().generic_string<char>();
+    buffer.uri = dest.filename().generic_string<char>();
     buffer.data.resize(vertOffset + vertexBytes);
 
 
@@ -456,7 +456,7 @@ int bake(Path path)
   tinygltf::TinyGLTF storer;
   dest.replace_extension(".gltf");
   spdlog::info("Writing result to: {}", dest);
-  if (!storer.WriteGltfSceneToFile(&model, dest, false, false, true, false)) {
+  if (!storer.WriteGltfSceneToFile(&model, dest.generic_string<char>(), false, false, true, false)) {
     spdlog::error("Writing is unsuccessful");
   }
 

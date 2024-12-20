@@ -13,7 +13,8 @@ layout (location = 0 ) in VS_OUT
 layout(binding = 0) uniform sampler2D albedo;
 layout(binding = 1) uniform sampler2D normal;
 layout(binding = 2) uniform sampler2D material;
-layout(binding = 3) uniform sampler2D depth;
+layout(binding = 3) uniform sampler2D wc;
+layout(binding = 4) uniform sampler2D depth;
 
 layout(push_constant) uniform pc_t
 {
@@ -47,12 +48,12 @@ void main(void)
   const vec4 normal_wc = texture(normal, texCoord);
   const mat3 ipv3 = transpose(inverse(mat3(params.mProjView)));
   const vec3 normal = normalize(ipv3 * normal_wc.xyz);
-  const float wc    = normal_wc.w; 
+  const float wc    = texture(wc, texCoord).r; 
   
   const float depth = texture(depth, texCoord).w;
   const vec3 lightDir = getPos(depth, wc) - surf.lightSrc.xyz;
-  const float dist = length(lightDir);
-  if (dot(normalize(lightDir), normal) < 0) {
+  const float dist = length(transpose(ipv3) * lightDir);
+  if (dist < params.pos.w) {
     out_fragColor.rgb = getLight(getPos(depth, wc), normal, params.color.rgb, surfaceColor, texture(material, texCoord)).rgb;
     out_fragColor.a = max(sin(3.14 * (1 - dist / surf.lightSrc.w)), 0);
   }

@@ -14,7 +14,8 @@ layout (location = 0 ) in VS_OUT
 layout(binding = 0) uniform sampler2D albedo;
 layout(binding = 1) uniform sampler2D normal;
 layout(binding = 2) uniform sampler2D material;
-layout(binding = 3) uniform sampler2D depth;
+layout(binding = 3) uniform sampler2D wc;
+layout(binding = 4) uniform sampler2D depth;
 
 layout(push_constant) uniform pc_t
 {
@@ -47,8 +48,8 @@ void main(void)
   const vec4 normal_wc = texture(normal, surf.texCoord);
   const mat3 ipv3 = transpose(inverse(mat3(params.mProjView)));
   const vec3 normal = normalize(ipv3 * normal_wc.xyz);
-  const float wc    = normal_wc.w;
-  const float depthV = texture(depth, surf.texCoord).w;
+  const float wc    = texture(wc, surf.texCoord).r;
+  const float depthV = texture(depth, surf.texCoord).r;
   const vec3 pos = getPos(depthV, wc);
   const vec4 mat = texture(material, surf.texCoord);
   // Only sunlight. Other are in sphere_deferred;

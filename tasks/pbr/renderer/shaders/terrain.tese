@@ -35,9 +35,7 @@ void main()
     vec2 t11 = TextureCoord[3];
     
 
-    vec2 t0 = (t01 - t00) * u + t00;
-    vec2 t1 = (t11 - t10) * u + t10;
-    vec2 t  = (t1 - t0) * v + t0;
+    vec2 t  = (t01 - t00) * u + (t10 - t00) * v + t00;
 
     vec4 p00 = gl_in[0].gl_Position;
     vec4 p01 = gl_in[1].gl_Position;
@@ -47,11 +45,9 @@ void main()
     float tstep = (t01.y - t00.y) / params.degree; 
     float pstep = (p01.z - p00.z) / params.degree; 
     
-    vec4 p0 = (p01 - p00) * u + p00;
-    vec4 p1 = (p11 - p10) * u + p10;
-    vec4 p = (p1 - p0) * v + p0;
+    vec4 p  = (p01 - p00) * u + (p10 - p00) * v + p00;
 
-    float h   = texture(heightMap, t  ).r * 64.0 - 16.0;
+    float h   = texture(heightMap, t).r * 64.0 - 16.0;
     h = max(h, 14);
 
     float hn0 = texture(heightMap, t + vec2(tstep,    0)).r * 64.0 - 16.0;

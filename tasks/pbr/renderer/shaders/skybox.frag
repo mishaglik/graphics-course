@@ -16,5 +16,5 @@ layout(push_constant) uniform pc {
 } params;
 
 void main() {
-    out_fragColor = texture(skybox, vIn.texCoord);
+    out_fragColor = texture(skybox, normalize(vIn.texCoord));
 }

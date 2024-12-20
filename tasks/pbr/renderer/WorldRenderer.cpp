@@ -63,10 +63,11 @@ void WorldRenderer::allocateResources(glm::uvec2 swapchain_resolution)
 }
 
 void WorldRenderer::allocateGBuffer() {
-  auto& albedo = gBuffer[0];
-  auto& normal = gBuffer[1];
+  auto& albedo    = gBuffer[0];
+  auto& normal    = gBuffer[1];
   auto& material  = gBuffer[2];
-  auto& depth     = gBuffer[3];
+  auto& wc        = gBuffer[3];
+  auto& depth     = gBuffer[4];
 
   auto& ctx = etna::get_context(); 
 
@@ -88,6 +89,13 @@ void WorldRenderer::allocateGBuffer() {
     .extent = vk::Extent3D{resolution.x, resolution.y, 1},
     .name = "gBuffer_material",
     .format = vk::Format::eB8G8R8A8Unorm,
+    .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+  });
+
+  wc = ctx.createImage({
+    .extent = vk::Extent3D{resolution.x, resolution.y, 1},
+    .name = "gBuffer_wc",
+    .format = vk::Format::eR32Sfloat,
     .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
   });
 
@@ -114,6 +122,11 @@ void WorldRenderer::allocateGBuffer() {
     etna::RenderTargetState::AttachmentParams {
       .image = material.get(),
       .view  = material.getView({}),
+      .imageAspect = vk::ImageAspectFlagBits::eColor,
+    },
+    etna::RenderTargetState::AttachmentParams {
+      .image = wc.get(),
+      .view  = wc.getView({}),
       .imageAspect = vk::ImageAspectFlagBits::eColor,
     },
   };
@@ -272,6 +285,11 @@ void WorldRenderer::setupPipelines(vk::Format swapchain_format)
             .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
               vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
           },
+          vk::PipelineColorBlendAttachmentState{
+            .blendEnable = vk::False,
+            .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+              vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
+          },
         },
         .logicOpEnable = false,
         .logicOp = {},
@@ -283,6 +301,7 @@ void WorldRenderer::setupPipelines(vk::Format swapchain_format)
             gBuffer[0].getFormat(), /*albedo*/
             gBuffer[1].getFormat(), /*normal*/
             gBuffer[2].getFormat(), /*materials*/
+            gBuffer[3].getFormat(), /*wc*/
           },
           .depthAttachmentFormat = gBuffer.back().getFormat(),
         },
@@ -313,6 +332,11 @@ void WorldRenderer::setupPipelines(vk::Format swapchain_format)
             .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
               vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
           },
+          vk::PipelineColorBlendAttachmentState{
+            .blendEnable = vk::False,
+            .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+              vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
+          },
         },
         .logicOpEnable = false,
         .logicOp = {},
@@ -325,6 +349,7 @@ void WorldRenderer::setupPipelines(vk::Format swapchain_format)
           gBuffer[0].getFormat(), /*albedo*/
           gBuffer[1].getFormat(), /*normal*/
           gBuffer[2].getFormat(), /*materials*/
+          gBuffer[3].getFormat(), /*wc*/
         },
         .depthAttachmentFormat = gBuffer.back().getFormat(),
       },
@@ -358,6 +383,11 @@ void WorldRenderer::setupPipelines(vk::Format swapchain_format)
             .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
               vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
           },
+          vk::PipelineColorBlendAttachmentState{
+            .blendEnable = vk::False,
+            .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+              vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
+          },
         },
         .logicOpEnable = false,
         .logicOp = {},
@@ -369,6 +399,7 @@ void WorldRenderer::setupPipelines(vk::Format swapchain_format)
             gBuffer[0].getFormat(), /*albedo*/
             gBuffer[1].getFormat(), /*normal*/
             gBuffer[2].getFormat(), /*materials*/
+            gBuffer[3].getFormat(), /*wc*/
           },
           .depthAttachmentFormat = gBuffer.back().getFormat(),
         },
@@ -536,7 +567,7 @@ void WorldRenderer::renderScene(
   cmd_buf.bindIndexBuffer(sceneMgr->getIndexBuffer(), 0, vk::IndexType::eUint32);
 
 
-  pushConst2M.projView = glob_tm;
+  pushConst2M.projView = worldViewProj;
   auto set0 = etna::create_descriptor_set(
   staticMesh.getDescriptorLayoutId(0),
   cmd_buf,
@@ -785,6 +816,7 @@ void WorldRenderer::renderWorld(
 
 static bool IsNotVisble(const glm::mat2x3 bounds, const glm::mat4x4& transform)
 {
+  return false;
   const glm::vec3 origin = transform * glm::vec4(bounds[0], 1.f);
   glm::mat3 oldExtent = glm::mat3(
     bounds[1].x, 0, 0,
@@ -1028,9 +1060,10 @@ void WorldRenderer::renderLights(vk::CommandBuffer cmd_buf)
         etna::Binding{1, gBuffer[1].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
         etna::Binding{2, gBuffer[2].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
         etna::Binding{3, gBuffer[3].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+        etna::Binding{4, gBuffer[4].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
       }
     );
-    assert(gBuffer.size() == 4);
+    assert(gBuffer.size() == 5);
     
     cmd_buf.bindDescriptorSets(
       vk::PipelineBindPoint::eGraphics,
@@ -1197,10 +1230,11 @@ void WorldRenderer::renderSphereDeferred(vk::CommandBuffer cmd_buf)
         etna::Binding{0, gBuffer[0].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
         etna::Binding{1, gBuffer[1].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
         etna::Binding{2, gBuffer[2].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
-        etna::Binding{3, gBuffer[3].genBinding(defaultSampler.get(), vk::ImageLayout::eDepthReadOnlyStencilAttachmentOptimal)},
+        etna::Binding{3, gBuffer[3].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+        etna::Binding{4, gBuffer[4].genBinding(defaultSampler.get(), vk::ImageLayout::eDepthReadOnlyStencilAttachmentOptimal)},
       }
     );
-    assert(gBuffer.size() == 4);
+    assert(gBuffer.size() == 5);
     
     cmd_buf.bindDescriptorSets(
       vk::PipelineBindPoint::eGraphics,
@@ -1325,6 +1359,6 @@ void WorldRenderer::renderSkybox(vk::CommandBuffer cmd_buf) {
       &worldViewProj
     );
 
-    cmd_buf.draw(6, 6, 0, 0);
+    cmd_buf.draw(3, 1, 0, 0);
   }
 }

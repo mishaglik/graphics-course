@@ -60,6 +60,8 @@ public:
     glm::vec4 position;
     glm::vec4 color;
     float visibleRadius = 0.f;
+    glm::vec4 floatingAmplitude = {0.f, 0.f, 0.f, 0.f};
+    glm::vec4 floatingSpeed     = {0.f, 0.f, 0.f, 0.f};
   };
 
   const std::vector<LightSource>& getLights() const { return lightSources; }

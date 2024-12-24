@@ -6,6 +6,11 @@
 #include <etna/Profiling.hpp>
 #include <glm/ext.hpp>
 
+#include <math.h>
+#ifndef M_PIf
+#define M_PIf 3.14159265358979323846f
+#endif
+
 const std::size_t N_MAX_INSTANCES = 1 << 14;
 const vk::Format BACKBUFFER_FORMAT = vk::Format::eB10G11R11UfloatPack32;
 WorldRenderer::WorldRenderer()
@@ -448,6 +453,11 @@ void WorldRenderer::debugInput(const Keyboard& kb)
     useToneMap = !useToneMap;
     spdlog::info("Tonemap is {}", useToneMap ? "on" : "off");
   }
+   if (kb[KeyboardKey::kPause] == ButtonState::Falling)
+  {
+    pause = !pause;
+    spdlog::info("Pause is {}", useToneMap ? "on" : "off");
+  }
 }
 
 void WorldRenderer::update(const FramePacket& packet)
@@ -460,7 +470,9 @@ void WorldRenderer::update(const FramePacket& packet)
     worldViewProj = packet.mainCam.projTm(aspect) * packet.mainCam.viewTm();
     pushConstantsTerrain.camPos = packet.mainCam.position;
   }
-  
+  if(!pause) {
+    frameTime = packet.currentTime; 
+  }
 }
 
 void WorldRenderer::renderScene(
@@ -1165,7 +1177,8 @@ void WorldRenderer::renderSphereDeferred(vk::CommandBuffer cmd_buf)
     uint32_t n = static_cast<uint32_t>((500.f * fovCorrection * lights[i].position.w / dist)) + 1;
     n = std::min(n, 128u);
     struct {glm::mat4x4 pv; glm::vec4 pos, color; float degree;} pushConstants{worldViewProj, lights[i].position, lights[i].color, M_PIf / n};
-
+    pushConstants.pos += lights[i].floatingAmplitude * glm::sin(lights[i].floatingSpeed * static_cast<float>(frameTime));
+    pushConstants.pos.w = lights[i].position.w;
     cmd_buf.pushConstants(
       pipeline.getVkPipelineLayout(), 
       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
@@ -1196,10 +1209,14 @@ void WorldRenderer::renderSphere(vk::CommandBuffer cmd_buf)
   for(std::size_t i = 1; i < lights.size(); ++i) {
     const float dist = glm::length(glm::vec3(worldViewProj * glm::vec4(lights[i].position.x, lights[i].position.y, lights[i].position.z, 1)));
     const float fovCorrection = glm::length(glm::vec3(worldViewProj[0]));
-    uint32_t n = static_cast<uint32_t>((500.f * fovCorrection * lights[i].visibleRadius / dist)) + 1;
+    uint32_t n = static_cast<uint32_t>((900.f * fovCorrection * lights[i].visibleRadius / dist));
+    if(n == 0) continue;
     n = std::min(n, 128u);
+    n = std::max(n, 5u);
     struct {glm::mat4x4 pv; glm::vec4 pos, color; float degree;} pushConstants{worldViewProj, lights[i].position, lights[i].color, M_PIf / n};
     pushConstants.pos.w = lights[i].visibleRadius;
+    pushConstants.pos += lights[i].floatingAmplitude * glm::sin(lights[i].floatingSpeed * static_cast<float>(frameTime));
+    
     cmd_buf.pushConstants(
       pipeline.getVkPipelineLayout(), 
       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,

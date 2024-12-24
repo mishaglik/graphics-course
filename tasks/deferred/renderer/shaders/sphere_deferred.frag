@@ -51,12 +51,11 @@ void main(void)
   const float wc     = texture(wc,    texCoord).r;
   
   const float depth = texture(depth, texCoord).w;
-  //const vec3 lightDir = getPos(depth, wc) - surf.lightSrc.xyz;
   const vec3 lightDir = getPos(depth, wc) - (params.mProjView * vec4(params.pos.xyz, 1)).xyz;
   const float dist = length(transpose(ipv3) * lightDir);
   if (dist < params.pos.w) {
-    out_fragColor.rgb = getLight(surf.lightDir, normal, params.color.rgb).rgb * surfaceColor;
-    out_fragColor.a = max(sin(3.14 * (1 - dist / surf.lightSrc.w)), 0);
+    out_fragColor.rgb = getLight(lightDir, normal, params.color.rgb).rgb * surfaceColor;
+    out_fragColor.a = max(sin(3.14 * (1 - dist / params.pos.w) / 2), 0);
   }
 }
 

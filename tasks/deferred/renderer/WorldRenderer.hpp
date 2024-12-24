@@ -108,5 +108,8 @@ private:
   std::vector<std::size_t> nInstances;
 
   bool useToneMap = false;
-  bool wireframe = false;
+  bool wireframe  = false;
+  bool pause      = false;
+
+  double frameTime = 0.;
 };

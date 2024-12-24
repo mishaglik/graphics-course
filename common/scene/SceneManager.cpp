@@ -619,7 +619,8 @@ void SceneManager::setupLights()
 #endif 
   for (size_t i = 0; i < 1000; ++i) {
     auto randCoord = []() {return (rand() % 400 - 200) / 10.f;};
-    lightSources.emplace(glm::vec4{randCoord(), rand() % 10, randCoord(), 1.f}, randomColor(), 0.1f);
+    auto id = lightSources.emplace(glm::vec4{randCoord(), rand() % 10 - 2, randCoord(), 1.f}, randomColor(), 0.1f, 2.f * randomColor(), randomColor());
+    lightSources[id].floatingAmplitude.w *= lightSources[id].visibleRadius / 10;
   }
 }
 

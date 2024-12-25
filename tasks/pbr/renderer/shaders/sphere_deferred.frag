@@ -34,9 +34,11 @@ vec3 getPos(float depth, float wc) {
   ) / wc;
 }
 
-vec4 getLight(vec3 pos, vec3 normal, vec3 lightColor, vec3 surfaceColor, vec4 material)
+vec4 getLight(vec3 pos, vec3 normal, vec3 lightColor, vec3 lightDir, vec3 surfaceColor, vec4 material)
 {
-  return vec4(pbr_light(surfaceColor, pos, normal, -surf.lightDir, material) * lightColor, 1.f);
+  if(dot(normal, normalize(-lightDir)) < 0)
+    return vec4(0);
+  return vec4(pbr_light(surfaceColor, pos, normal, normalize(-lightDir), material) * lightColor, 1.f);
 }
 
 void main(void)
@@ -48,13 +50,13 @@ void main(void)
   const vec4 normal_wc = texture(normal, texCoord);
   const mat3 ipv3 = transpose(inverse(mat3(params.mProjView)));
   const vec3 normal = normalize(ipv3 * normal_wc.xyz);
-  const float wc    = texture(wc, texCoord).r; 
+  const float wc     = texture(wc,    texCoord).r;
   
   const float depth = texture(depth, texCoord).w;
-  const vec3 lightDir = getPos(depth, wc) - surf.lightSrc.xyz;
+  const vec3 lightDir = getPos(depth, wc) - (params.mProjView * vec4(params.pos.xyz, 1)).xyz;
   const float dist = length(transpose(ipv3) * lightDir);
   if (dist < params.pos.w) {
-    out_fragColor.rgb = getLight(getPos(depth, wc), normal, params.color.rgb, surfaceColor, texture(material, texCoord)).rgb;
-    out_fragColor.a = max(sin(3.14 * (1 - dist / surf.lightSrc.w)), 0);
+    out_fragColor.rgb = getLight(getPos(depth, wc), normal, params.color.rgb, lightDir, surfaceColor, texture(material, texCoord)).rgb;
+    out_fragColor.a = max(sin(3.14 * (1 - dist / params.pos.w) / 2), 0);
   }
 }

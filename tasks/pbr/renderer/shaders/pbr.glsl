@@ -7,7 +7,7 @@ vec3 specular_D(float roughnessSq, float NdotH) {
 }
 
 vec3 specular_Smith(float roughnessSq, float NdotX) {
-    float d = NdotX + sqrt(mix(NdotX * NdotX, 1, roughnessSq));
+    float d = abs(NdotX) + sqrt(mix(NdotX * NdotX, 1, roughnessSq));
     return vec3(1. / d);
 }
 
@@ -20,7 +20,7 @@ vec3 specular_brdf(float roughnessSq, float NdotH, float NdotL, float NdotV) {
 }
 
 vec3 conductor_fresnel(vec3 bsdf, vec3 f0, float VdotH) {
-  return bsdf * (f0 + (vec3(1) - f0) * pow(clamp(1.0 - VdotH, 0.0, 1.0), 5.0));
+  return bsdf * (f0 + (vec3(1) - f0) * pow(clamp(1.0 - abs(VdotH), 0.0, 1.0), 5.0));
 }
 
 vec3 fresnel_mix(vec3 base, vec3 layer, float VdotH) {

@@ -46,10 +46,10 @@ vec3 getPos() {
 void main()
 {
   out_fragColor = texture(baseColorTexture, surf.texCoord) * params.color;
-  vec3 bitangent = cross(surf.wNorm.xyz, surf.wTangent.xyz) * surf.wTangent.w;
-  vec4 normalMap = texture(normalTexture, surf.normTexCoord); 
+  vec3 bitangent = normalize(cross(surf.wNorm.xyz, surf.wTangent.xyz));
+  vec4 normalMap = texture(normalTexture, surf.texCoord); 
 
-  out_fragNormal.xyz = normalize(surf.wNorm.xyz * normalMap.r + surf.wTangent.xyz * normalMap.g + bitangent * normalMap.z);
+  out_fragNormal.xyz = normalize(surf.wNorm.xyz * normalMap.r + surf.wTangent.xyz * normalMap.g + bitangent * normalMap.b);
   out_fragWc = gl_FragCoord.w;
   out_fragMaterial = params.emr_ * texture(emr_Texture, surf.normTexCoord);
 }

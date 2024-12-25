@@ -37,8 +37,8 @@ vec3 getPos(float depth, float wc) {
 vec4 getLight(vec3 lightPos, vec3 pos, vec3 normal, vec3 lightColor, vec3 surfaceColor, vec4 material)
 {
   const vec3 lightDir   = normalize(lightPos - pos);
-  return vec4(pbr_light(surfaceColor, pos, normal, lightDir, material), 1.f);
-  //return vec4(surfaceColor, 1) * 0.05;
+  return vec4(pbr_light(surfaceColor, pos, normal, normalize(lightPos), material), 1.f);
+//  return vec4(surfaceColor, 1) * 0.05;
 }
 
 void main(void)
@@ -54,7 +54,7 @@ void main(void)
   const vec4 mat = texture(material, surf.texCoord);
   // Only sunlight. Other are in sphere_deferred;
   //const vec3 lightPos = params.position.xyz;
-  const vec3 lightPos =  vec3(-15, 10, -20);
+  const vec3 lightPos = vec3(-15, 10, -20);
   out_fragColor = getLight((params.mProjView * vec4(lightPos, 1)).xyz, pos, normal, params.color.rgb, surfaceColor, mat);
   //out_fragColor.rgb *= surfaceColor;
 }

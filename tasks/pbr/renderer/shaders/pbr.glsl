@@ -51,7 +51,7 @@ vec3 pbr_light(vec3 baseColor, vec3 pos, vec3 normal, vec3 lightDir, vec4 materi
         spec = specular_brdf(roughness * roughness, dot(n, h), dot(n, l), dot(n, v));
     }
     vec3 metal_brdf = conductor_fresnel(spec, baseColor, vdoth);
-    vec3 dielectric_brdf = fresnel_mix(lambertian(baseColor), spec, vdoth);
+    vec3 dielectric_brdf = fresnel_mix(clamp(dot(n, l), 0.05, 1) * lambertian(baseColor), spec, vdoth);
     return mix(
         dielectric_brdf,
         metal_brdf,

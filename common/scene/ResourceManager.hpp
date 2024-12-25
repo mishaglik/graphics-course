@@ -34,6 +34,11 @@ public:
         return resources[static_cast<uint32_t>(id)];
     }
 
+    T& get(T::Id id) {
+        assert(static_cast<uint32_t>(id) < resources.size());
+        return resources[static_cast<uint32_t>(id)];
+    }
+
     auto begin() const { return resources.begin(); }
     auto end  () const { return resources.end();   }
 

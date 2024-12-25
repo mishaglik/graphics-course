@@ -759,7 +759,7 @@ void WorldRenderer::renderTerrain(
   const float step = 2.f / nChunks;
 
   pushConstantsTerrain.extent = {step, step};
-  pushConstantsTerrain.mat  = pushConst2M.projView;
+  pushConstantsTerrain.mat  = worldViewProj;
   pushConstantsTerrain.degree = 256;
   for (size_t x = 0; x < nChunks; ++x) {
     for (size_t y = 0; y < nChunks; ++y) {

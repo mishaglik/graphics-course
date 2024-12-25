@@ -36,13 +36,8 @@ vec3 heightColor(float height)
 vec4 heightMaterial(float height)
 {
   if(height > 25)
-    return vec4(0, 0.5,   0, 1);
-  if(height < 14.01)
-    return vec4(0, 0.5,   0, 1);
-  if(height < 14.1)
-    return vec4(0, 0.5,   0, 1);
-
-  return vec4(0, 0.5, 0, 1);
+    return vec4(0, 0.5, 0.0, 1);
+  return vec4(0, 0.8, 0.0, 1);
 }
 
 void main(void)

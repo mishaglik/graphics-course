@@ -599,7 +599,7 @@ void WorldRenderer::renderScene(
       Material::Id mid = relems[j].materialId;
       auto& material = sceneMgr->get(mid == Material::Id::Invalid ? sceneMgr->getStubMaterial() : relems[j].materialId);
       auto& baseColorImage = sceneMgr->get(material.baseColorTexture).image;
-      auto& normalImage = normalMap ? sceneMgr->get(material.normalTexture).image : sceneMgr->get(sceneMgr->getStubRedTexture()).image;
+      auto& normalImage = normalMap ? sceneMgr->get(material.normalTexture).image : sceneMgr->get(sceneMgr->getStubBlueTexture()).image;
       auto& metallicRoughnessImage = normalMap ? sceneMgr->get(material.metallicRoughnessTexture).image : sceneMgr->get(sceneMgr->getStubTexture()).image;
       auto set1 = etna::create_descriptor_set(
         staticMesh.getDescriptorLayoutId(1),

@@ -34,11 +34,11 @@ vec3 getPos(float depth, float wc) {
   ) / wc;
 }
 
-vec4 getLight(vec3 lightPos, vec3 pos, vec3 normal, vec3 lightColor, vec3 surfaceColor, vec4 material)
+vec4 getLight(vec3 lightPos, vec3 pos, vec3 normal, vec3 lightColor, vec3 surfaceColor, vec4 material, mat3 ipv3)
 {
-  const vec3 lightDir   = normalize(lightPos - pos);
-  return vec4(pbr_light(surfaceColor, pos, normal, normalize(lightPos), material), 1.f);
-//  return vec4(surfaceColor, 1) * 0.05;
+  vec3 apos = pos - (params.mProjView * vec4(0, 0, 0, 1)).xyz;
+  const vec3 lightDir   = normalize(lightPos - apos);
+  return vec4(pbr_light(surfaceColor, pos, normal, lightDir, material) + 0.05 * surfaceColor, 1.f);
 }
 
 void main(void)
@@ -46,15 +46,18 @@ void main(void)
   const vec3 surfaceColor = texture(albedo, surf.texCoord).rgb;
 
   const vec4 normal_wc = texture(normal, surf.texCoord);
-  const mat3 ipv3 = transpose(inverse(mat3(params.mProjView)));
-  const vec3 normal = normalize(ipv3 * normal_wc.xyz);
-  const float wc    = texture(wc, surf.texCoord).r;
-  const float depthV = texture(depth, surf.texCoord).r;
-  const vec3 pos = getPos(depthV, wc);
-  const vec4 mat = texture(material, surf.texCoord);
-  // Only sunlight. Other are in sphere_deferred;
-  const vec3 lightPos = (params.mProjView * vec4(-150, 100, -200, 1)).xyz;
+  vec3 normal = normal_wc.xyz;
+  if(length(normal) < 0.5) {
+    normal = vec3(0, 1, 0);
+  }
   
-  out_fragColor = getLight(lightPos, pos, normal, params.color.rgb, surfaceColor, mat);
+  const mat3 ipv3 = inverse(mat3(params.mProjView));
+  
+  const float wc     = texture(wc, surf.texCoord).r;
+  const float depthV = texture(depth, surf.texCoord).r;
+  const vec3 pos = ipv3 * getPos(depthV, wc);
+  const vec4 mat = texture(material, surf.texCoord);
+  out_fragColor = getLight(vec3(-150, 100, -200), pos, normal, params.color.rgb, surfaceColor, mat, ipv3);
+  
 }
 

@@ -19,6 +19,7 @@ layout(binding = 4) uniform sampler2D depth;
 layout(push_constant) uniform pc_t
 {
     mat4 mProjView;
+    mat4 mView;
     vec4 pos;
     vec4 color;
     float degree;
@@ -48,17 +49,22 @@ void main(void)
   const vec3 surfaceColor = texture(albedo, texCoord).rgb;
 
   const vec4 normal_wc = texture(normal, texCoord);
-  const mat3 ipv3 = transpose(inverse(mat3(params.mProjView)));
-  vec3 normal = normalize(ipv3 * normal_wc.xyz);
+  const mat3 ipv3 = transpose(inverse(mat3(params.mView)));
+
+  vec3 normal = normal_wc.xyz;
   if(length(normal) < 0.5)
     normal = vec3(0, 1, 0);
-  const float wc     = texture(wc,    texCoord).r;
+  normal = normalize(ipv3 * normal);
   
-  const float depth = texture(depth, texCoord).w;
-  const vec3 lightDir = getPos(depth, wc) - (params.mProjView * vec4(params.pos.xyz, 1)).xyz;
+  const float wc     = texture(wc,    texCoord).r;
+  const float depthV = texture(depth, texCoord).w;
+  const vec3 pos_screen = getPos(depthV, wc);
+  const vec3 pos = mat3(params.mView) * inverse(mat3(params.mProjView)) * pos_screen;
+  
+  const vec3 lightDir = pos - (params.mView * vec4(params.pos.xyz, 1)).xyz;
   const float dist = length(transpose(ipv3) * lightDir);
   if (dist < params.pos.w) {
-    out_fragColor.rgb = getLight(getPos(depth, wc), normal, params.color.rgb, lightDir, surfaceColor, texture(material, texCoord)).rgb;
+    out_fragColor.rgb = getLight(pos, normal, params.color.rgb, lightDir, surfaceColor, texture(material, texCoord)).rgb;
     out_fragColor.a = max(sin(3.14 * (1 - dist / params.pos.w) / 2), 0);
   }
 }

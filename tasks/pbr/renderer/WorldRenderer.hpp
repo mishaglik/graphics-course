@@ -88,6 +88,8 @@ private:
   } pushConstantsTerrain;
 
   glm::mat4x4 worldViewProj;
+  glm::mat4x4 worldView;
+  
   glm::mat4x4 lightMatrix;
 
   etna::GraphicsPipeline staticMeshPipeline{};

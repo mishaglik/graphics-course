@@ -558,6 +558,7 @@ void WorldRenderer::update(const FramePacket& packet)
   {
     const float aspect = float(resolution.x) / float(resolution.y);
     worldViewProj = packet.mainCam.projTm(aspect) * packet.mainCam.viewTm();
+    worldView = packet.mainCam.viewTm();
     pushConstantsTerrain.camPos = packet.mainCam.position;
   }
   if(!pause) {
@@ -1086,7 +1087,7 @@ void WorldRenderer::renderLights(vk::CommandBuffer cmd_buf)
       {}
     );
     LightSource::Id sunId = static_cast<LightSource::Id>(0);
-    struct {glm::mat4x4 pv; glm::vec4 pos, color;} pushConstants{worldViewProj, sceneMgr->getLights()[sunId].position, sceneMgr->getLights()[sunId].colorRange};
+    struct {glm::mat4x4 pv, v; glm::vec4 pos, color;} pushConstants{worldViewProj, worldView, sceneMgr->getLights()[sunId].position, sceneMgr->getLights()[sunId].colorRange};
 
     cmd_buf.pushConstants(
       pipeline.getVkPipelineLayout(), 
@@ -1265,7 +1266,7 @@ void WorldRenderer::renderSphereDeferred(vk::CommandBuffer cmd_buf)
       continue;
     }
     n = std::min(n, 128u);
-    struct {glm::mat4x4 pv; glm::vec4 pos, color; float degree;} pushConstants{worldViewProj, light.position, light.colorRange, M_PIf / n};
+    struct {glm::mat4x4 pv, v; glm::vec4 pos, color; float degree;} pushConstants{worldViewProj, worldView, light.position, light.colorRange, M_PIf / n};
     pushConstants.pos += light.floatingAmplitude * glm::sin(light.floatingSpeed * static_cast<float>(frameTime));
     pushConstants.pos.w = light.position.w;
     cmd_buf.pushConstants(
@@ -1310,7 +1311,7 @@ void WorldRenderer::renderSphere(vk::CommandBuffer cmd_buf)
     if (n == 0) continue;
     n = std::min(n, 128u);
     n = std::max(n,   5u);
-    struct {glm::mat4x4 pv; glm::vec4 pos, color; float degree;} pushConstants{worldViewProj, light.position, light.colorRange, M_PIf / n};
+    struct {glm::mat4x4 pv, v; glm::vec4 pos, color; float degree;} pushConstants{worldViewProj, worldView, light.position, light.colorRange, M_PIf / n};
     pushConstants.pos.w = light.visibleRadius;
     pushConstants.pos += light.floatingAmplitude * glm::sin(light.floatingSpeed * static_cast<float>(frameTime));
     cmd_buf.pushConstants(

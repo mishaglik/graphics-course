@@ -20,6 +20,7 @@ layout(binding = 4) uniform sampler2D depth;
 layout(push_constant) uniform pc_t
 {
     mat4 mProjView;
+    mat4 mView;
     vec4 position;
     vec4 color;
 } params;
@@ -46,17 +47,20 @@ void main(void)
   const vec3 surfaceColor = texture(albedo, surf.texCoord).rgb;
 
   const vec4 normal_wc = texture(normal, surf.texCoord);
-  const mat3 ipv3 = transpose(inverse(mat3(params.mProjView)));
-  vec3 normal = normalize(ipv3 * normal_wc.xyz);
+  const mat3 ipv3 = transpose(inverse(mat3(params.mView)));
+  vec3 normal = normal_wc.xyz;
   if(length(normal) < 0.5)
     normal = vec3(0, 1, 0);
+  normal = normalize(ipv3 * normal);
   const float wc    = texture(wc, surf.texCoord).r;
   const float depthV = texture(depth, surf.texCoord).r;
-  const vec3 pos = getPos(depthV, wc);
+  const vec3 pos_screen = getPos(depthV, wc);
+  const vec3 pos = mat3(params.mView) * inverse(mat3(params.mProjView)) * pos_screen;
+
   const vec4 mat = texture(material, surf.texCoord);
   // Only sunlight. Other are in sphere_deferred;
-  const vec3 lightPos = (params.mProjView * vec4(-150, 100, -200, 1)).xyz;
-  
+  const vec3 lightPos = (params.mView * vec4(-150, 100, -200, 0)).xyz;
+
   out_fragColor = getLight(lightPos, pos, normal, params.color.rgb, surfaceColor, mat);
 }
 

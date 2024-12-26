@@ -47,7 +47,9 @@ void main(void)
 
   const vec4 normal_wc = texture(normal, surf.texCoord);
   const mat3 ipv3 = transpose(inverse(mat3(params.mProjView)));
-  const vec3 normal = normalize(ipv3 * normal_wc.xyz);
+  vec3 normal = normalize(ipv3 * normal_wc.xyz);
+  if(length(normal) < 0.5)
+    normal = vec3(0, 1, 0);
   const float wc    = texture(wc, surf.texCoord).r;
   const float depthV = texture(depth, surf.texCoord).r;
   const vec3 pos = getPos(depthV, wc);

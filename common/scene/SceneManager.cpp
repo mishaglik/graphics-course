@@ -657,7 +657,7 @@ void SceneManager::loadModelResources(std::filesystem::path path, const tinygltf
     auto img = ctx.createImage({
         .extent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1},
         .name = tex.uri,
-        /*TODO: .format =  */
+        .format = vk::Format::eR8G8B8A8Unorm,
         .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
     });
 
@@ -740,7 +740,7 @@ void SceneManager::processMaterials(const tinygltf::Model& model) {
     if (material.normalTexture.index != -1) {
       m.normalTexture = static_cast<decltype(m.normalTexture)>(material.normalTexture.index);
     } else {
-      m.normalTexture = getStubRedTexture();
+      m.normalTexture = getStubBlueTexture();
     }
     spdlog::info("New material: {} {{", materials.size());
     spdlog::info("    .baseColorTexture={}", static_cast<uint32_t>(m.baseColorTexture));
@@ -818,6 +818,41 @@ Texture::Id SceneManager::getStubRedTexture() {
   ETNA_CHECK_VK_RESULT(cmdBuf.end());
   cmdMgr->submitAndWait(cmdBuf);
   return stubRedTexture = textures.emplace(std::move(tex));
+}
+
+Texture::Id SceneManager::getStubBlueTexture() {
+  if (stubBlueTexture != Texture::Id::Invalid) {
+    return stubBlueTexture;
+  }
+  etna::Image tex = etna::get_context().createImage({
+    .extent = {1, 1, 1},
+    .name = "stub blue",
+    .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+    .type = vk::ImageType::e2D,
+  });
+
+  auto cmdMgr = etna::get_context().createOneShotCmdMgr();
+  auto cmdBuf = cmdMgr->start();
+  ETNA_CHECK_VK_RESULT(cmdBuf.begin(vk::CommandBufferBeginInfo{}));
+  {
+    etna::RenderTargetState renderTargets(
+      cmdBuf,
+      {{0, 0}, {1, 1}},
+      {{.image=tex.get(), .view=tex.getView({}), .clearColorValue={0.f, 0.f, 1.f, 0.f}}},
+      {}
+    );
+  }
+  etna::set_state(
+    cmdBuf, 
+    tex.get(), 
+    vk::PipelineStageFlagBits2::eAllCommands, 
+    vk::AccessFlagBits2::eShaderSampledRead, 
+    vk::ImageLayout::eShaderReadOnlyOptimal, 
+    vk::ImageAspectFlagBits::eColor
+  );
+  ETNA_CHECK_VK_RESULT(cmdBuf.end());
+  cmdMgr->submitAndWait(cmdBuf);
+  return stubBlueTexture = textures.emplace(std::move(tex));
 }
 
 Material::Id SceneManager::getStubMaterial() {

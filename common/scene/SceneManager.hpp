@@ -71,6 +71,7 @@ public:
   Material::Id getStubMaterial();
   Texture::Id getStubTexture();
   Texture::Id getStubRedTexture();
+  Texture::Id getStubBlueTexture();
 private:
 
   std::optional<tinygltf::Model> loadModel(std::filesystem::path path);
@@ -137,5 +138,6 @@ private:
   ResourceManager<Texture > textures;
   Texture::Id stubTexture = Texture::Id::Invalid;
   Texture::Id stubRedTexture = Texture::Id::Invalid;
+  Texture::Id stubBlueTexture = Texture::Id::Invalid;
   Material::Id stubMaterial = Material::Id::Invalid;
 };

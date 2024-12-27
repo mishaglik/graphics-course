@@ -593,9 +593,11 @@ void WorldRenderer::renderScene(
   std::size_t firstInstance = 0;
   for (std::size_t j = 0; j < relems.size(); ++j)
   {
-    
-    if (j == 8) //Skip drawing water as it is rendered by terrain  
+    //Skip drawing water as it is rendered by terrain
+    if (j == 8) {
+      firstInstance += nInstances[j];
       continue;
+    }  
     if (nInstances[j] != 0)
     {
       Material::Id mid = relems[j].materialId;

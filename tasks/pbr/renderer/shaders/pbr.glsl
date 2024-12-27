@@ -35,24 +35,24 @@ vec3 lambertian(vec3 color) {
     return color / M_PI;
 }
 
-vec3 pbr_light(vec3 baseColor, vec3 pos, vec3 normal, vec3 lightDir, vec4 material)
+vec3 pbr_light(vec3 baseColor, vec3 pos, vec3 normal, vec3 lightDir, vec4 material, vec3 reflection)
 {
     const float roughness = material.g; 
     const float metallic  = material.b; 
-    
+
     const vec3 v = normalize(-pos);
     const vec3 l = normalize(lightDir);
     const vec3 n = normalize(normal);
     const vec3 h = normalize(l + v);
-    
-    const float vdoth = dot(v, h); 
+    const mat3 iv3 = inverse(mat3(params.mView));
+    const float vdoth = dot(normalize(iv3 * v), normalize(iv3 * h)); 
     const float ndotl = clamp(dot(n, l), 0, 1); 
 
     vec3 spec = vec3(0);
     if(dot(h, l) >= 0 && dot(h, v) >= 0 && dot(n, h) >= 0) {
         spec = specular_brdf(roughness * roughness, dot(n, h), dot(n, l), dot(n, v));
     }
-    vec3 metal_brdf = conductor_fresnel(ndotl * spec, baseColor, vdoth);
+    vec3 metal_brdf = conductor_fresnel(spec, baseColor * reflection, vdoth);
     vec3 dielectric_brdf = fresnel_mix(max(ndotl, 0.05) * lambertian(baseColor), ndotl == 0 ? (max(ndotl, 0.05) * lambertian(baseColor)) : spec, vdoth);
     return mix(
         dielectric_brdf,

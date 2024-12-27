@@ -1,7 +1,6 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_GOOGLE_include_directive : require
-#include "pbr.glsl"
 layout(location = 0) out vec4 out_fragColor;
 
 layout (location = 0 ) in VS_OUT
@@ -18,12 +17,13 @@ layout(binding = 4) uniform sampler2D depth;
 
 layout(push_constant) uniform pc_t
 {
-    mat4 mProjView;
+    mat4 mProj;
     mat4 mView;
     vec4 pos;
     vec4 color;
     float degree;
 } params;
+#include "pbr.glsl"
 
 const vec2 resolution = vec2(1280, 720);
 
@@ -39,7 +39,7 @@ vec4 getLight(vec3 pos, vec3 normal, vec3 lightColor, vec3 lightDir, vec3 surfac
 {
   if(dot(normal, normalize(-lightDir)) < 0)
     return vec4(0);
-  return vec4(pbr_light(surfaceColor, pos, normal, normalize(-lightDir), material) * lightColor, 1.f);
+  return vec4(pbr_light(surfaceColor, pos, normal, normalize(-lightDir), material, vec3(1, 1, 1)), 1.f);
 }
 
 void main(void)
@@ -59,7 +59,7 @@ void main(void)
   const float wc     = texture(wc,    texCoord).r;
   const float depthV = texture(depth, texCoord).w;
   const vec3 pos_screen = getPos(depthV, wc);
-  const vec3 pos = mat3(params.mView) * inverse(mat3(params.mProjView)) * pos_screen;
+  const vec3 pos = inverse(mat3(params.mProj)) * pos_screen;
   
   const vec3 lightDir = pos - (params.mView * vec4(params.pos.xyz, 1)).xyz;
   const float dist = length(transpose(ipv3) * lightDir);

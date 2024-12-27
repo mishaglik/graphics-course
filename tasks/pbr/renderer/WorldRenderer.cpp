@@ -559,6 +559,7 @@ void WorldRenderer::update(const FramePacket& packet)
     const float aspect = float(resolution.x) / float(resolution.y);
     worldViewProj = packet.mainCam.projTm(aspect) * packet.mainCam.viewTm();
     worldView = packet.mainCam.viewTm();
+    worldProj = packet.mainCam.projTm(aspect);
     pushConstantsTerrain.camPos = packet.mainCam.position;
   }
   if(!pause) {
@@ -600,7 +601,7 @@ void WorldRenderer::renderScene(
       Material::Id mid = relems[j].materialId;
       auto& material = sceneMgr->get(mid == Material::Id::Invalid ? sceneMgr->getStubMaterial() : relems[j].materialId);
       auto& baseColorImage = sceneMgr->get(material.baseColorTexture).image;
-      auto& normalImage = normalMap ? sceneMgr->get(material.normalTexture).image : sceneMgr->get(sceneMgr->getStubRedTexture()).image;
+      auto& normalImage = normalMap ? sceneMgr->get(material.normalTexture).image : sceneMgr->get(sceneMgr->getStubBlueTexture()).image;
       auto& metallicRoughnessImage = normalMap ? sceneMgr->get(material.metallicRoughnessTexture).image : sceneMgr->get(sceneMgr->getStubTexture()).image;
       auto set1 = etna::create_descriptor_set(
         staticMesh.getDescriptorLayoutId(1),
@@ -1075,6 +1076,7 @@ void WorldRenderer::renderLights(vk::CommandBuffer cmd_buf)
         etna::Binding{2, gBuffer[2].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
         etna::Binding{3, gBuffer[3].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
         etna::Binding{4, gBuffer[4].genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+        etna::Binding{5, skybox.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal, {.layerCount=6, .type=vk::ImageViewType::eCube})}
       }
     );
     assert(gBuffer.size() == 5);
@@ -1086,8 +1088,9 @@ void WorldRenderer::renderLights(vk::CommandBuffer cmd_buf)
       {set.getVkSet()},
       {}
     );
+
     LightSource::Id sunId = static_cast<LightSource::Id>(0);
-    struct {glm::mat4x4 pv, v; glm::vec4 pos, color;} pushConstants{worldViewProj, worldView, sceneMgr->getLights()[sunId].position, sceneMgr->getLights()[sunId].colorRange};
+    struct {glm::mat4x4 p, v; glm::vec4 pos, color;} pushConstants{worldProj, worldView, sceneMgr->getLights()[sunId].position, sceneMgr->getLights()[sunId].colorRange};
 
     cmd_buf.pushConstants(
       pipeline.getVkPipelineLayout(), 
@@ -1266,7 +1269,7 @@ void WorldRenderer::renderSphereDeferred(vk::CommandBuffer cmd_buf)
       continue;
     }
     n = std::min(n, 128u);
-    struct {glm::mat4x4 pv, v; glm::vec4 pos, color; float degree;} pushConstants{worldViewProj, worldView, light.position, light.colorRange, M_PIf / n};
+    struct {glm::mat4x4 pv, v; glm::vec4 pos, color; float degree;} pushConstants{worldProj, worldView, light.position, light.colorRange, M_PIf / n};
     pushConstants.pos += light.floatingAmplitude * glm::sin(light.floatingSpeed * static_cast<float>(frameTime));
     pushConstants.pos.w = light.position.w;
     cmd_buf.pushConstants(
@@ -1311,7 +1314,7 @@ void WorldRenderer::renderSphere(vk::CommandBuffer cmd_buf)
     if (n == 0) continue;
     n = std::min(n, 128u);
     n = std::max(n,   5u);
-    struct {glm::mat4x4 pv, v; glm::vec4 pos, color; float degree;} pushConstants{worldViewProj, worldView, light.position, light.colorRange, M_PIf / n};
+    struct {glm::mat4x4 pv, v; glm::vec4 pos, color; float degree;} pushConstants{worldProj, worldView, light.position, light.colorRange, M_PIf / n};
     pushConstants.pos.w = light.visibleRadius;
     pushConstants.pos += light.floatingAmplitude * glm::sin(light.floatingSpeed * static_cast<float>(frameTime));
     cmd_buf.pushConstants(

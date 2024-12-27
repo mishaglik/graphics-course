@@ -43,11 +43,11 @@ void main(void)
   const vec4 wTang = vec4(decode_normal(floatBitsToInt(vTexCoordAndTang.z)), 0.0f);
 
   vOut.wPos   = (ims.mModels[gl_InstanceIndex] * vec4(vPosNorm.xyz, 1.0f)).xyz;
-  mat3 invModel = mat3(transpose(inverse(ims.mModels[gl_InstanceIndex])));
+  mat3 invModel = transpose(inverse(mat3(ims.mModels[gl_InstanceIndex])));
   vOut.wNorm.xyz    = normalize(invModel * wNorm.xyz);
   vOut.wTangent.xyz = normalize(invModel * wTang.xyz);
-  vOut.wNorm.w = 1;
-  vOut.wTangent.w = 1;
+  vOut.wNorm.w = 0;
+  vOut.wTangent.w = 0;
   vOut.texCoord = vTexCoordAndTang.xy;
   vOut.normTexCoord = vNormTexCoord.xy;
 

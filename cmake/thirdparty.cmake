@@ -54,7 +54,8 @@ CPMAddPackage(
 CPMAddPackage(
   NAME etna
   GITHUB_REPOSITORY mishaglik/etna
-  VERSION 1.9.0.descriptorIndexing
+  VERSION 1.9.0
+  GIT_TAG v1.9.0.withDescriptorIndexing
 )
 
 # Type-erased function containers that actually work

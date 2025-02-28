@@ -18,3 +18,12 @@ target_link_libraries(pipelines INTERFACE
     resolvegbuffer_pipeline
     tonemap_pipeline
 )
+
+add_custom_target(pipeline_shaders DEPENDS 
+    skybox_pipeline_shaders
+    terrain_pipeline_shaders
+    staticmesh_pipeline_shaders
+    resolvegbuffer_pipeline_shaders
+    tonemap_pipeline_shaders
+    perlin_pipeline_shaders
+)

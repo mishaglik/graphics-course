@@ -39,6 +39,10 @@ PerlinPipeline::loadShaders()
         { PERLIN_PIPELINE_SHADERS_ROOT "perlin.vert.spv",
           PERLIN_PIPELINE_SHADERS_ROOT "perlin.frag.spv"}
     );
+    etna::create_program(
+        "perlin_shader_compute",
+        { PERLIN_PIPELINE_SHADERS_ROOT "perlin.comp.spv"}
+    );
 }
 
 void 
@@ -55,6 +59,8 @@ PerlinPipeline::setup()
           .depthAttachmentFormat  = RenderTarget::DEPTH_ATTACHMENT_FORMAT,
         },
     });
+
+    pipeline2 = pipelineManager.createComputePipeline("perlin_shader_compute", {});
 }
 
 void 
@@ -68,65 +74,83 @@ PerlinPipeline::debugInput(const Keyboard& /*kb*/)
 {
 
 }
-
+#define NO_GRAPHIC_PIPELINE
 void 
-PerlinPipeline::render(vk::CommandBuffer cmd_buf, targets::TerrainChunk& prev)
+PerlinPipeline::render(vk::CommandBuffer cmd_buf, targets::TerrainChunk& dst, uint octaves)
 {
     ETNA_PROFILE_GPU(cmd_buf, pipelines_perlin_upscale);
-    auto shader = etna::get_shader_program("perlin_shader");
-    auto set = etna::create_descriptor_set(shader.getDescriptorLayoutId(0),
-        cmd_buf, {
-            etna::Binding(0, prev.getImage(0).genBinding(m_sampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal))
+    pushConstant.octave = octaves;
+    #ifndef NO_GRAPHIC_PIPELINE
+    cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.getVkPipeline());
+    cmd_buf.pushConstants(pipeline.getVkPipelineLayout(), vk::ShaderStageFlagBits::eFragment, 0, sizeof(pushConstant), &pushConstant);
+    cmd_buf.draw(3, 1, 0, 0);
+    (void)dst;
+    #else
+    auto pipelineInfo = etna::get_shader_program("perlin_shader_compute");
+    
+    auto set = etna::create_descriptor_set(
+        pipelineInfo.getDescriptorLayoutId(0),
+        cmd_buf,
+        {
+            etna::Binding{0, dst.getImage(0).genBinding(m_sampler.get(), vk::ImageLayout::eGeneral)},
         }
     );
-    cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.getVkPipeline());
+        
+    cmd_buf.bindPipeline(vk::PipelineBindPoint::eCompute, pipeline2.getVkPipeline());
+    
     cmd_buf.bindDescriptorSets(
-        vk::PipelineBindPoint::eGraphics,
-        pipeline.getVkPipelineLayout(),
+        vk::PipelineBindPoint::eCompute,
+        pipeline2.getVkPipelineLayout(),  
         0,
         {set.getVkSet()},
         {}
     );
-    cmd_buf.pushConstants(pipeline.getVkPipelineLayout(), vk::ShaderStageFlagBits::eFragment, 0, sizeof(pushConstant), &pushConstant);
-    cmd_buf.draw(3, 1, 0, 0);
-    nextOctave();
+
+    cmd_buf.pushConstants(pipeline2.getVkPipelineLayout(), vk::ShaderStageFlagBits::eCompute, 0, sizeof(pushConstant), &pushConstant);
+
+
+    cmd_buf.dispatch((dst.getResolution().x + 31) / 32, (dst.getResolution().y + 31) / 32, 1);
+
+    #endif
 }
 
-void generate_chunk(vk::CommandBuffer cmd_buf, PerlinPipeline& pipeline, targets::TerrainChunk& dst, targets::TerrainChunk& tmp, float frequency, std::size_t octaves)
+void generate_chunk(vk::CommandBuffer cmd_buf, PerlinPipeline& pipeline, targets::TerrainChunk& dst, targets::TerrainChunk& , float frequency, std::size_t octaves)
 {
     // a + a/2 + ... + a/2^{octaves-1} = a * (2 - 2 ^ {1-octaves}) => Base multiplier should be 1 / (2 - 2^{1-octaves}) = 2 ^{octaves-1} / (2^{octaves} - 1);
-    pipeline.reset(dst.getStartPos(), dst.getExtentPos(), frequency, 1.f / (2.f - std::ldexp(2.f, -octaves)));
-    std::array<targets::TerrainChunk*, 2> targets = {&dst, &tmp};
-    if (octaves % 2 == 0) {
-        std::swap(targets[0], targets[1]);
+    pipeline.reset(dst.getStartPos(), dst.getExtentPos(), frequency);
+    #ifndef NO_GRAPHIC_PIPELINE
+    
+    {
+        auto& target = dst;
+        target.setState(cmd_buf,
+            vk::PipelineStageFlagBits2::eColorAttachmentOutput, 
+            vk::AccessFlagBits2::eColorAttachmentWrite, 
+            vk::ImageLayout::eColorAttachmentOptimal, 
+            vk::ImageAspectFlagBits::eColor
+        );
+        
+        etna::flush_barriers(cmd_buf);
+        etna::RenderTargetState renderTarget{
+            cmd_buf,
+            {{0, 0}, {dst.getResolution().x, dst.getResolution().y}},
+            target.getColorAttachments(),
+            {},
+            BarrierBehavoir::eSuppressBarriers
+        };
+        pipeline.render(cmd_buf, dst, octaves);
     }
-    for(std::size_t i = 0; i < octaves; i++) {
-        {
-            auto& target = *targets[i & 1];
-            auto& prev   = *targets[1 - (i & 1)];
-            target.setState(cmd_buf,
-                vk::PipelineStageFlagBits2::eColorAttachmentOutput, 
-                vk::AccessFlagBits2::eColorAttachmentWrite, 
-                vk::ImageLayout::eColorAttachmentOptimal, 
-                vk::ImageAspectFlagBits::eColor
-            );
-            prev.setState(cmd_buf, 
-                vk::PipelineStageFlagBits2::eFragmentShader, 
-                vk::AccessFlagBits2::eShaderSampledRead, 
-                vk::ImageLayout::eShaderReadOnlyOptimal, 
-                vk::ImageAspectFlagBits::eColor
-            );
-            etna::flush_barriers(cmd_buf);
-            etna::RenderTargetState renderTarget{
-                cmd_buf,
-                {{0, 0}, {dst.getResolution().x, dst.getResolution().y}},
-                target.getColorAttachments(),
-                {},
-                BarrierBehavoir::eSuppressBarriers
-            };
-            pipeline.render(cmd_buf, *targets[1 - (i & 1)]);
-        }
-    }
+    #else
+    auto& target = dst;
+    target.setState(cmd_buf,
+        vk::PipelineStageFlagBits2::eComputeShader, 
+        vk::AccessFlagBits2::eShaderWrite, 
+        vk::ImageLayout::eGeneral, 
+        vk::ImageAspectFlagBits::eColor
+    );
+    etna::flush_barriers(cmd_buf);
+
+    pipeline.render(cmd_buf, dst, octaves);
+    #endif
 }
 
 

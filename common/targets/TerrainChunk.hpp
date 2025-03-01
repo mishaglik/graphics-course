@@ -21,10 +21,13 @@ public:
 
     void setState(vk::CommandBuffer com_buffer, vk::PipelineStageFlags2 pipeline_stage_flags, vk::AccessFlags2 access_flags, vk::ImageLayout layout, vk::ImageAspectFlags aspect_flags);
 
-    void setPosition(glm::vec2 start, glm::vec2 extent) { startPos = start; extentPos = extent; }
+    void setPosition(glm::vec2 start) { startPos = start; }
+    void setExtent(glm::vec2 extent) { extentPos = extent; }
 
     glm::vec2 getStartPos () const { return startPos;  }
     glm::vec2 getExtentPos() const { return extentPos; }
+
+    glm::ivec2 iPos;
 private:
     std::array<etna::Image, N_COLOR_ATTACHMENTS> color_buffer;
 

@@ -106,6 +106,7 @@ StaticMeshPipeline::drawGui()
 {
   ImGui::Checkbox("culling", &enableCulling);
   ImGui::Checkbox("use normal maps", &normalMap);
+  ImGui::InputFloat3("starting pos", &pushConst2M.pos.x);
 }
 
 void 

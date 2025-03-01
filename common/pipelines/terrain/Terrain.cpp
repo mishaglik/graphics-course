@@ -17,7 +17,10 @@ void
 TerrainPipeline::allocate()
 {
     terrainGenerator.allocate();
-    chunk.allocate({heightMapResolution, heightMapResolution});
+    for(std::size_t i = 0; i < N_CLIP_LEVELS; ++i) {
+      auto& level = levels[i];
+      level.allocate({32<<i, 32<<i}, heightMapResolution);
+    }
     tmp  .allocate({heightMapResolution, heightMapResolution});
     // auto& ctx = etna::get_context();
 }
@@ -134,11 +137,11 @@ void
 TerrainPipeline::drawGui()
 {
     if(ImGui::TreeNode("Generator settings")) {
-        if(ImGui::SliderInt("Terrain scale", &terrainScale, 1, 12)) {
+        if(ImGui::SliderInt("Terrain scale", &terrainScale, 1, 32)) {
           terrainValid = true;
         }
         
-        if(ImGui::SliderFloat("Frequency", &startFrequency, 0, 10)) {
+        if(ImGui::SliderFloat("Frequency", &startFrequency, 0, 1)) {
           terrainValid = false;
         }
         
@@ -150,7 +153,8 @@ TerrainPipeline::drawGui()
     }
 
     ImGui::SliderFloat("Max height", &pushConstants.maxHeight, 1, 100);
-    ImGui::SliderFloat("Sea level", &pushConstants.seaLevel, -pushConstants.maxHeight, pushConstants.maxHeight);
+    ImGui::SliderFloat("Sea level", &pushConstants.seaLevel, 0, pushConstants.maxHeight);
+    ImGui::SliderInt("Active layers", &activeLayers, 1, N_CLIP_LEVELS);
     ImGui::Checkbox("Wireframe [F3]", &wireframe);
 }
 
@@ -169,36 +173,53 @@ TerrainPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer& target, con
 {
   ETNA_PROFILE_GPU(cmd_buf, renderTerrain);
   pushConstants.mat  = ctx.worldViewProj;
+  pushConstants.camPos  = ctx.camPos;
     
   auto& currentPipeline = wireframe ? pipelineDebug : pipeline;
   
   cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, currentPipeline.getVkPipeline());
   
-  drawChunk(cmd_buf, chunk);
+  for(int i = 0; i < activeLayers; ++i) {
+    auto& level = levels[i];
+    for(auto& chunk: level.getChunks())
+    {
+      uint8_t mask = 0;
+      if (i != 0) {
+        glm::ivec2 idx = chunk.iPos * 2;
+        glm::ivec2 bIdx = levels[i-1].getIPos();
+        if(idx.x - bIdx.x >  0) mask |= 0b1100;
+        if(idx.x - bIdx.x >  1) mask |= 0b1111;
+        if(idx.x - bIdx.x < -2) mask |= 0b0011;
+        if(idx.x - bIdx.x < -3) mask |= 0b1111;
+
+        if(idx.y - bIdx.y >  0) mask |= 0b1010;
+        if(idx.y - bIdx.y >  1) mask |= 0b1111;
+        if(idx.y - bIdx.y < -2) mask |= 0b0101;
+        if(idx.y - bIdx.y < -3) mask |= 0b1111;
+      } else {
+        mask = 0xF;
+      }
+      drawChunk(cmd_buf, chunk, mask);
+    }
+  }
 
   return target;
 }
 
 void 
-TerrainPipeline::regenerateTerrainIfNeeded(vk::CommandBuffer cmd_buf)
+TerrainPipeline::regenerateTerrainIfNeeded(vk::CommandBuffer cmd_buf, glm::vec2 pos)
 {
-  if(terrainValid)
-    return;
-
   ETNA_PROFILE_GPU(cmd_buf, terrainGenerator);
-  chunk.setPosition({-1, -1}, {2, 2});
-  generate_chunk(cmd_buf, terrainGenerator, chunk, tmp, startFrequency, terrainScale);
-  chunk.setState(cmd_buf,
-    vk::PipelineStageFlagBits2::eTessellationEvaluationShader, 
-    vk::AccessFlagBits2::eShaderSampledRead, 
-    vk::ImageLayout::eShaderReadOnlyOptimal, 
-    vk::ImageAspectFlagBits::eColor
-  );
+  for(std::size_t i = 0; i < N_CLIP_LEVELS; ++i) {
+    auto& level = levels[i];
+    level.update(cmd_buf, terrainGenerator, pos, tmp, startFrequency, terrainScale-std::min((int)i, terrainScale-1), !terrainValid);
+  }
+
   terrainValid = true;
 }
 
 void 
-TerrainPipeline::drawChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& cur_chunk)
+TerrainPipeline::drawChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& cur_chunk, uint8_t chunk_mask)
 {
   auto& hmap = cur_chunk.getImage(0); 
   
@@ -218,24 +239,29 @@ TerrainPipeline::drawChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& cur
     {}
   );
 
-  const size_t nChunks = heightMapResolution / MAX_TESCELLATION;
+  const size_t nChunks = std::max(2ul, heightMapResolution / MAX_TESCELLATION);
+  const size_t nHalfChunks = nChunks / 2;
 
   pushConstants.extent = cur_chunk.getExtentPos() / float(nChunks);
   pushConstants.degree = 256;
-  for (size_t x = 0; x < nChunks; ++x) {
-    for (size_t y = 0; y < nChunks; ++y) {
-      pushConstants.base = cur_chunk.getStartPos() + glm::vec2{float(x), float(y)} * pushConstants.extent;
-
+  pushConstants.nHalfChunks = nHalfChunks;
+  pushConstants.base = cur_chunk.getStartPos();
+  for(size_t i = 0; i < 2; ++i) {
+    for(size_t j = 0; j < 2; ++j) {
+      pushConstants.subChunk = 2*i+j;
+      if((chunk_mask & 1) != 0) {
         cmd_buf.pushConstants(
-            pipeline.getVkPipelineLayout(), 
-              vk::ShaderStageFlagBits::eVertex |
-              vk::ShaderStageFlagBits::eTessellationEvaluation |
-              vk::ShaderStageFlagBits::eTessellationControl,
-              0, 
-            sizeof(pushConstants), &pushConstants
+          pipeline.getVkPipelineLayout(), 
+          vk::ShaderStageFlagBits::eVertex |
+          vk::ShaderStageFlagBits::eTessellationEvaluation |
+          vk::ShaderStageFlagBits::eTessellationControl,
+          0, 
+          sizeof(pushConstants), &pushConstants
         );
-
-        cmd_buf.draw(4, 1, 0, 0);
+        
+        cmd_buf.draw(4, nHalfChunks * nHalfChunks, 0, 0);
+      }
+      chunk_mask >>= 1;
     }
   }
 }

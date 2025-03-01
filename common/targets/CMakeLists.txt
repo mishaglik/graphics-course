@@ -1,4 +1,4 @@
-add_library(targets Backbuffer.cpp GBuffer.cpp Frame.cpp)
+add_library(targets Backbuffer.cpp GBuffer.cpp Frame.cpp TerrainChunk.cpp)
 
 target_include_directories(targets PUBLIC ..)
 

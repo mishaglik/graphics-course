@@ -13,6 +13,8 @@ layout(push_constant) uniform params_t
   mat4 mProjView;
   vec3 camPos;
   int degree;
+  float seaLevel;
+  float maxHeight;
 } params;
 
 void main()

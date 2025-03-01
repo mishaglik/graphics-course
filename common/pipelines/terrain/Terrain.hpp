@@ -31,10 +31,14 @@ public:
     
     void debugInput(const Keyboard& /*kb*/);
 
-    RenderTarget& render(vk::CommandBuffer cmd_buf, RenderTarget& target, const RenderContext& context);
-private: 
-    void regenTerrain();
+    void prepare(vk::CommandBuffer cmd_buf, const RenderContext& /*context*/) { regenerateTerrainIfNeeded(cmd_buf); }
+    RenderTarget& render (vk::CommandBuffer cmd_buf, RenderTarget& target, const RenderContext& context);
 
+private: 
+    
+    void regenerateTerrainIfNeeded(vk::CommandBuffer cmd_buf);
+    
+    void drawChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& cur_chunk);
 
 
 private:
@@ -44,14 +48,27 @@ private:
         glm::mat4x4 mat; 
         glm::vec3 camPos;
         int degree;
+        float seaLevel = 14.f;
+        float maxHeight = 64.f;
     } pushConstants;
 
     etna::GraphicsPipeline pipeline;
     etna::GraphicsPipeline pipelineDebug;
-    PerlinPipeline heightmapGenerator;
+    
+    PerlinPipeline terrainGenerator;
+    targets::TerrainChunk chunk;
+    targets::TerrainChunk tmp;
 
     int terrainScale = 12;
     bool wireframe = false;
+
+    float startFrequency = 1.f;
+
+    
+    bool terrainValid = false;
+
+    uint64_t heightMapResolution = 1024;
+    static const uint64_t MAX_TESCELLATION = 64; //FIXME: Use vulkan info
 };
 
 }

@@ -42,8 +42,8 @@ private:
   etna::Sampler defaultSampler;
 
   bool usePbr = true;
-  bool secondaryLight        = true;
-  bool secondaryLightSources = true;
+  bool secondaryLight        = false;
+  bool secondaryLightSources = false;
 
   bool normalAsAlbedo = false;
 };

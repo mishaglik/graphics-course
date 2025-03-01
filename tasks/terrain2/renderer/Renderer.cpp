@@ -95,6 +95,7 @@ void Renderer::debugInput(const Keyboard& kb)
 
 void Renderer::update(const FramePacket& packet)
 {
+  pos = packet.mainCam.position;
   worldRenderer->update(packet);
 }
 
@@ -106,6 +107,7 @@ void Renderer::drawFrame()
     ZoneScopedN("drawGui");
     guiRenderer->nextFrame();
     ImGui::NewFrame();
+    ImGui::InputFloat3("Position", &pos.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
     worldRenderer->drawGui();
     ImGui::Render();
   }

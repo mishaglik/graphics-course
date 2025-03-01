@@ -92,5 +92,6 @@ public:
 
   bool pause = false;
 
+  bool enableStaticMesh = false;
   
 };

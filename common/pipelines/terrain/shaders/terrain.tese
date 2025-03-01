@@ -9,6 +9,8 @@ layout(push_constant) uniform params_t
   mat4 mProjView;
   vec3 camPos;
   int degree;
+  float seaLevel;
+  float maxHeight;
 } params;
 
 
@@ -47,13 +49,16 @@ void main()
     
     vec4 p  = (p01 - p00) * u + (p10 - p00) * v + p00;
 
-    float h   = texture(heightMap, t).r * 64.0 - 16.0;
-    h = max(h, 14);
+    float h   = texture(heightMap, t).r * params.maxHeight;
+    h = max(h, params.seaLevel);
+    // h=14;
 
-    float hn0 = texture(heightMap, t + vec2(tstep,    0)).r * 64.0 - 16.0;
-    float hn1 = texture(heightMap, t + vec2(   0, tstep)).r * 64.0 - 16.0;
-    hn0 = max(hn0, 14);
-    hn1 = max(hn1, 14);
+    float hn0 = texture(heightMap, t + vec2(tstep,    0)).r * params.maxHeight;
+    float hn1 = texture(heightMap, t + vec2(   0, tstep)).r * params.maxHeight;
+    hn0 = max(hn0, params.seaLevel);
+    hn1 = max(hn1, params.seaLevel);
+    // hn0=14;
+    // hn1=14;
 
     vec4 pn0 = p + vec4(pstep, 0, 0, 0);
     vec4 pn1 = p + vec4(0, 0, pstep, 0);
@@ -69,7 +74,7 @@ void main()
     //vec4 normal = normalize(pn0 - p);
 
     surf.texCoord = t;
-    surf.height   = h;
+    surf.height   = texture(heightMap, t).r;
     surf.normal = -normal;
 
     gl_Position = params.mProjView * vec4(p.xyz, 1);

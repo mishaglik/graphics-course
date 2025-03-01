@@ -13,4 +13,5 @@ target_link_libraries(perlin_pipeline PUBLIC etna targets gui PRIVATE scene)
 target_add_shaders(perlin_pipeline
   shaders/perlin.vert
   shaders/perlin.frag
+  shaders/perlin.comp
 )

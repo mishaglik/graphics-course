@@ -11,6 +11,8 @@ layout(push_constant) uniform params_t
   int degree;
   float seaLevel;
   float maxHeight;
+  uint nChunks;
+  uint subChunk;
 } params;
 
 
@@ -63,15 +65,13 @@ void main()
     vec4 pn0 = p + vec4(pstep, 0, 0, 0);
     vec4 pn1 = p + vec4(0, 0, pstep, 0);
 
-    vec4 vertical = vec4(0, 0.5, 0, 0);
+    vec4 vertical = vec4(0, 1, 0, 0);
 
     p   += vertical * h;
     pn0 += vertical * hn0;
     pn1 += vertical * hn1;
 
     vec4 normal = vec4(normalize(cross((pn0 - p).xyz, (pn1-p).xyz)), 0);
-    //vec4 normal = vec4(0, 1, 0, 0);
-    //vec4 normal = normalize(pn0 - p);
 
     surf.texCoord = t;
     surf.height   = texture(heightMap, t).r;

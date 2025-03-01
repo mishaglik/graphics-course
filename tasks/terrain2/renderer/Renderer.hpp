@@ -36,6 +36,7 @@ private:
   std::unique_ptr<etna::PerFrameCmdMgr> commandManager;
 
   glm::uvec2 resolution;
+  glm::vec3 pos;
   bool useVsync = true;
 
   std::unique_ptr<WorldRenderer> worldRenderer;

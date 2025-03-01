@@ -15,6 +15,8 @@ layout(push_constant) uniform params_t
   int degree;
   float seaLevel;
   float maxHeight;
+  uint nChunks;
+  uint subChunk;
 } params;
 
 void main()
@@ -33,12 +35,12 @@ void main()
 
     if (gl_InvocationID == 0)
     {
-        gl_TessLevelOuter[0] = tscoef / pow(dists.x + dists.z, 2.5);
-        gl_TessLevelOuter[1] = tscoef / pow(dists.x + dists.y, 2.5);
-        gl_TessLevelOuter[2] = tscoef / pow(dists.y + dists.w, 2.5);
-        gl_TessLevelOuter[3] = tscoef / pow(dists.z + dists.w, 2.5);
+        gl_TessLevelOuter[0] = 64; //tscoef / pow(dists.x + dists.z, 2.5);
+        gl_TessLevelOuter[1] = 64; //tscoef / pow(dists.x + dists.y, 2.5);
+        gl_TessLevelOuter[2] = 64; //tscoef / pow(dists.y + dists.w, 2.5);
+        gl_TessLevelOuter[3] = 64; //tscoef / pow(dists.z + dists.w, 2.5);
 
-        gl_TessLevelInner[0] = gl_TessLevelOuter[0] + gl_TessLevelOuter[2];
-        gl_TessLevelInner[1] = gl_TessLevelOuter[1] + gl_TessLevelOuter[3];
+        gl_TessLevelInner[0] = 64; //gl_TessLevelOuter[0] + gl_TessLevelOuter[2];
+        gl_TessLevelInner[1] = 64; //gl_TessLevelOuter[1] + gl_TessLevelOuter[3];
     }
 }

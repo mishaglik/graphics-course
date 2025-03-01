@@ -9,7 +9,7 @@
 
 #include "pipelines/perlin/Perlin.hpp"
 #include "targets/GBuffer.hpp"
-#include "targets/Buffer.hpp"
+#include "Cliplevel.hpp"
 
 
 namespace pipes {
@@ -31,14 +31,14 @@ public:
     
     void debugInput(const Keyboard& /*kb*/);
 
-    void prepare(vk::CommandBuffer cmd_buf, const RenderContext& /*context*/) { regenerateTerrainIfNeeded(cmd_buf); }
+    void prepare(vk::CommandBuffer cmd_buf, const RenderContext& context) { regenerateTerrainIfNeeded(cmd_buf, {context.camPos.x, context.camPos.z}); }
     RenderTarget& render (vk::CommandBuffer cmd_buf, RenderTarget& target, const RenderContext& context);
 
 private: 
     
-    void regenerateTerrainIfNeeded(vk::CommandBuffer cmd_buf);
+    void regenerateTerrainIfNeeded(vk::CommandBuffer cmd_buf, glm::vec2 pos);
     
-    void drawChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& cur_chunk);
+    void drawChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& cur_chunk, uint8_t chunk_mask = 0xF);
 
 
 private:
@@ -50,24 +50,30 @@ private:
         int degree;
         float seaLevel = 14.f;
         float maxHeight = 64.f;
+        glm::uint nHalfChunks  = 0;
+        glm::uint subChunk = 0;
+
     } pushConstants;
 
     etna::GraphicsPipeline pipeline;
     etna::GraphicsPipeline pipelineDebug;
     
     PerlinPipeline terrainGenerator;
-    targets::TerrainChunk chunk;
+    static const std::size_t N_CLIP_LEVELS = 5;
+    std::array<pipelines::terrain::Cliplevel, N_CLIP_LEVELS> levels;
+
     targets::TerrainChunk tmp;
 
-    int terrainScale = 12;
+    int terrainScale = 7;
+    int activeLayers = 3;
     bool wireframe = false;
 
-    float startFrequency = 1.f;
+    float startFrequency = 0.003f;
 
     
     bool terrainValid = false;
 
-    uint64_t heightMapResolution = 1024;
+    uint64_t heightMapResolution = 256;
     static const uint64_t MAX_TESCELLATION = 64; //FIXME: Use vulkan info
 };
 

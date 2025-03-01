@@ -15,6 +15,7 @@ layout(push_constant) uniform params_t
   mat4 mModel;
   vec4 color;
   vec4 emr_;
+  vec3 startPos;
   uint relemIdx;
 } params;
 
@@ -42,7 +43,7 @@ void main(void)
   const vec4 wNorm = vec4(decode_normal(floatBitsToInt(vPosNorm.w)),     0.0f);
   const vec4 wTang = vec4(decode_normal(floatBitsToInt(vTexCoordAndTang.z)), 0.0f);
 
-  vOut.wPos   = (ims.mModels[gl_InstanceIndex] * vec4(vPosNorm.xyz, 1.0f)).xyz + vec3(0, 0, 14);
+  vOut.wPos   = (ims.mModels[gl_InstanceIndex] * vec4(vPosNorm.xyz, 1.0f)).xyz + params.startPos;
   mat3 invModel = transpose(inverse(mat3(ims.mModels[gl_InstanceIndex])));
   vOut.wNorm.xyz    = normalize(invModel * wNorm.xyz);
   vOut.wTangent.xyz = normalize(invModel * wTang.xyz);

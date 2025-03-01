@@ -121,6 +121,8 @@ void WorldRenderer::update(const FramePacket& packet)
 void WorldRenderer::renderWorld(
   vk::CommandBuffer cmd_buf, vk::Image target_image, vk::ImageView target_image_view)
 {
+  terrainPipeline2.prepare(cmd_buf, renderContext);
+
   ETNA_PROFILE_GPU(cmd_buf, renderToGBuffer);
   {
     
@@ -151,7 +153,8 @@ void WorldRenderer::renderWorld(
     });
 
     terrainPipeline2.render(cmd_buf, gbuffer2, renderContext);
-    staticMeshPipeline2.render(cmd_buf, gbuffer2, renderContext);
+    if (enableStaticMesh)
+      staticMeshPipeline2.render(cmd_buf, gbuffer2, renderContext);
   }
 
   {
@@ -294,6 +297,7 @@ WorldRenderer::drawGui()
     }
     if(ImGui::TreeNode("StaticMesh renderer settings"))
     {
+      ImGui::Checkbox("Enabled", &enableStaticMesh);
       staticMeshPipeline2.drawGui();
       ImGui::TreePop();
     }

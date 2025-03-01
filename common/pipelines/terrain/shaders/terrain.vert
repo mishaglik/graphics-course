@@ -14,20 +14,33 @@ layout(push_constant) uniform params_t
   vec3 camPos;
   int degree;
   float a,b;
+  uint nChunks;
+  uint subChunk;
 } params;
 
 void main() {
+  vec2 xy = vec2(0);
+  if (params.subChunk == 0) 
+    xy += vec2( 0,      0);
+  if (params.subChunk == 1) 
+    xy += vec2( 0, params.nChunks);
+  if (params.subChunk == 2) 
+    xy += vec2( params.nChunks,    0);
+  if (params.subChunk == 3) 
+    xy += vec2( params.nChunks, params.nChunks);
 
-  vec2 xy = vec2(0, 0);
+  xy += vec2(gl_InstanceIndex / params.nChunks, gl_InstanceIndex % params.nChunks);
+  
   if (gl_VertexIndex == 0) 
-    xy = vec2( 0,  0);
+    xy += vec2( 0,  0);
   if (gl_VertexIndex == 1) 
-    xy = vec2( 0,  1);
+    xy += vec2( 0,  1);
   if (gl_VertexIndex == 2) 
-    xy = vec2( 1,  0);
+    xy += vec2( 1,  0);
   if (gl_VertexIndex == 3) 
-    xy = vec2( 1,  1);
+    xy += vec2( 1,  1);
+
+  vOut.texCoord = xy / params.nChunks / 2;
   xy = params.base + xy * params.extent;
-  gl_Position = vec4(20 * xy.x, -7, 20 * xy.y, 1);
-  vOut.texCoord = xy * 0.5 + 0.5;
+  gl_Position = vec4(xy.x, 0, xy.y, 1);
 }

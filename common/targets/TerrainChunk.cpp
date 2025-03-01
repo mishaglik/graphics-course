@@ -23,7 +23,7 @@ TerrainChunk::allocate(glm::uvec2 extent)
       .extent = vk::Extent3D{resolution.x, resolution.y, 1},
       .name = names[i],
       .format = COLOR_ATTACHMENT_FORMATS[i],
-      .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+      .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage,
     });
   }
 

@@ -49,11 +49,11 @@ private:
         glm::mat4x4 projView;
         glm::mat4x4 model;
         glm::vec4 color, emr_factors;
+        glm::vec3 pos{16, 14, -64};
         glm::uint  instIdx;
     } pushConst2M;
 
     std::vector<std::size_t> nInstances;
-
     bool normalMap = true;
     bool enableCulling = false;
 };

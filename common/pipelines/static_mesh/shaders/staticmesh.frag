@@ -29,6 +29,7 @@ layout(push_constant) uniform params_t
   mat4 mModel;
   vec4 color;
   vec4 emr_;
+  vec3 pos;
   uint relemIdx;
 } params;
 

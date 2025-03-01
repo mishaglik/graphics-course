@@ -23,6 +23,13 @@ float depthToDist(float depth)
 
 vec3 heightColor(float height)
 {
+  height = clamp(height, 0, 1);
+  return vec3(
+    clamp(1-abs(2-3*height), 0, 1), 
+    clamp(1-abs(1-3*height), 0, 1), 
+    clamp(1-abs(0-3*height), 0, 1)
+    );
+  
   if(height > 25)
     return vec3(0.9, 0.9, 0.91);
   if(height < 14.01)

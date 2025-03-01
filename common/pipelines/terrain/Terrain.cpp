@@ -16,14 +16,16 @@ namespace pipes {
 void 
 TerrainPipeline::allocate()
 {
-    heightmapGenerator.allocate();
+    terrainGenerator.allocate();
+    chunk.allocate({heightMapResolution, heightMapResolution});
+    tmp  .allocate({heightMapResolution, heightMapResolution});
     // auto& ctx = etna::get_context();
 }
 
 void 
 TerrainPipeline::loadShaders() 
 {
-    heightmapGenerator.loadShaders();
+    terrainGenerator.loadShaders();
     etna::create_program(
         "terrain_shader",
         { TERRAIN_PIPELINE_SHADERS_ROOT "terrain.vert.spv",
@@ -36,7 +38,7 @@ TerrainPipeline::loadShaders()
 void 
 TerrainPipeline::setup() 
 {
-    heightmapGenerator.setup();
+    terrainGenerator.setup();
     auto& pipelineManager = etna::get_context().getPipelineManager();
 
     pipeline = pipelineManager.createGraphicsPipeline(
@@ -131,21 +133,31 @@ TerrainPipeline::setup()
 void 
 TerrainPipeline::drawGui()
 {
-    if(ImGui::TreeNode("perlin settings")) {
-        heightmapGenerator.drawGui();
+    if(ImGui::TreeNode("Generator settings")) {
+        if(ImGui::SliderInt("Terrain scale", &terrainScale, 1, 12)) {
+          terrainValid = true;
+        }
+        
+        if(ImGui::SliderFloat("Frequency", &startFrequency, 0, 10)) {
+          terrainValid = false;
+        }
+        
+        terrainGenerator.drawGui();
+        if(ImGui::Button("Regenerate")) {
+          terrainValid = false;
+        }
         ImGui::TreePop();
     }
-    ImGui::SliderInt("Terrain scale", &terrainScale, 1, 12);
-    if(ImGui::Button("Regenerate")) {
-        regenTerrain();
-    }
+
+    ImGui::SliderFloat("Max height", &pushConstants.maxHeight, 1, 100);
+    ImGui::SliderFloat("Sea level", &pushConstants.seaLevel, -pushConstants.maxHeight, pushConstants.maxHeight);
     ImGui::Checkbox("Wireframe [F3]", &wireframe);
 }
 
 void 
 TerrainPipeline::debugInput(const Keyboard& kb)
 {
-    heightmapGenerator.debugInput(kb);
+    terrainGenerator.debugInput(kb);
     if (kb[KeyboardKey::kF3] == ButtonState::Falling) {
         wireframe = !wireframe;
         spdlog::info("terrain wireframe is {}", wireframe ? "on" : "off");
@@ -156,52 +168,66 @@ targets::GBuffer&
 TerrainPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer& target, const RenderContext& ctx)
 {
   ETNA_PROFILE_GPU(cmd_buf, renderTerrain);
-  auto& hmap = heightmapGenerator.getImage(); 
-  
-  #if 0
-//FIXME
-  for(auto& atts: gBufferColorAttachments) atts.loadOp = vk::AttachmentLoadOp::eClear;
-  gBufferDepthAttachment.loadOp = vk::AttachmentLoadOp::eClear;
-  
-  etna::RenderTargetState renderTargets(
-    cmd_buf,
-    {{0, 0}, {ctx.resolution.x, ctx.resolution.y}},
-    target.getColorAttachments(),
-    target.getDepthAttachment()
-  );
-  #endif
-
-  auto terrainShader = etna::get_shader_program("terrain_shader");
+  pushConstants.mat  = ctx.worldViewProj;
+    
   auto& currentPipeline = wireframe ? pipelineDebug : pipeline;
-
+  
   cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, currentPipeline.getVkPipeline());
+  
+  drawChunk(cmd_buf, chunk);
+
+  return target;
+}
+
+void 
+TerrainPipeline::regenerateTerrainIfNeeded(vk::CommandBuffer cmd_buf)
+{
+  if(terrainValid)
+    return;
+
+  ETNA_PROFILE_GPU(cmd_buf, terrainGenerator);
+  chunk.setPosition({-1, -1}, {2, 2});
+  generate_chunk(cmd_buf, terrainGenerator, chunk, tmp, startFrequency, terrainScale);
+  chunk.setState(cmd_buf,
+    vk::PipelineStageFlagBits2::eTessellationEvaluationShader, 
+    vk::AccessFlagBits2::eShaderSampledRead, 
+    vk::ImageLayout::eShaderReadOnlyOptimal, 
+    vk::ImageAspectFlagBits::eColor
+  );
+  terrainValid = true;
+}
+
+void 
+TerrainPipeline::drawChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& cur_chunk)
+{
+  auto& hmap = cur_chunk.getImage(0); 
+  
+  auto terrainShader = etna::get_shader_program("terrain_shader");
 
   auto set = etna::create_descriptor_set(
     terrainShader.getDescriptorLayoutId(0),
     cmd_buf,
-    {etna::Binding{0, hmap.genBinding(heightmapGenerator.getSampler().get(), vk::ImageLayout::eShaderReadOnlyOptimal)}}
+    {etna::Binding{0, hmap.genBinding(terrainGenerator.getSampler().get(), vk::ImageLayout::eShaderReadOnlyOptimal)}}
   );
 
   cmd_buf.bindDescriptorSets(
     vk::PipelineBindPoint::eGraphics,
-    currentPipeline.getVkPipelineLayout(),
+    pipeline.getVkPipelineLayout(), //NOTE - Both pipelines share same layout. 
     0,
     {set.getVkSet()},
     {}
   );
 
-  const size_t nChunks = 16;
-  const float step = 2.f / nChunks;
+  const size_t nChunks = heightMapResolution / MAX_TESCELLATION;
 
-  pushConstants.extent = {step, step};
-  pushConstants.mat  = ctx.worldViewProj;
+  pushConstants.extent = cur_chunk.getExtentPos() / float(nChunks);
   pushConstants.degree = 256;
   for (size_t x = 0; x < nChunks; ++x) {
     for (size_t y = 0; y < nChunks; ++y) {
-      pushConstants.base = {-1.f + x * step, -1.f + y * step};
+      pushConstants.base = cur_chunk.getStartPos() + glm::vec2{float(x), float(y)} * pushConstants.extent;
 
         cmd_buf.pushConstants(
-            currentPipeline.getVkPipelineLayout(), 
+            pipeline.getVkPipelineLayout(), 
               vk::ShaderStageFlagBits::eVertex |
               vk::ShaderStageFlagBits::eTessellationEvaluation |
               vk::ShaderStageFlagBits::eTessellationControl,
@@ -212,20 +238,6 @@ TerrainPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer& target, con
         cmd_buf.draw(4, 1, 0, 0);
     }
   }
-
-    return target;
-}
-
-void 
-TerrainPipeline::regenTerrain()
-{
-  heightmapGenerator.render(*etna::get_context().createOneShotCmdMgr(), terrainScale);
-  #if 0
-  heightmap.reset();
-  for (int i = 0; i < terrainScale; i++) {
-    heightmap.upscale(*etna::get_context().createOneShotCmdMgr());
-  }
-  #endif
 }
 
 } /* namespace pipes */

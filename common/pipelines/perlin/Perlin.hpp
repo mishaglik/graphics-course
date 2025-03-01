@@ -7,15 +7,15 @@
 #include <etna/Image.hpp>
 #include <etna/Sampler.hpp>
 
-#include "targets/Backbuffer.hpp"
+#include "targets/TerrainChunk.hpp"
 
 
 namespace pipes {
 
 class PerlinPipeline {
 public:
-    // using RenderTarget = targets::Backbuffer;
-    // static_assert(RenderTarget::N_COLOR_ATTACHMENTS == 1, "Perlin renders into single layer");
+    using RenderTarget = targets::TerrainChunk;
+    static_assert(RenderTarget::N_COLOR_ATTACHMENTS == 1, "Perlin renders into single layer");
 
     PerlinPipeline() {}
     
@@ -29,28 +29,45 @@ public:
     
     void debugInput(const Keyboard& /*kb*/);
 
-    etna::Image& getImage() { return m_images[m_currentImage]; }
     etna::Sampler& getSampler() { return m_sampler; }
 
-    void render(etna::OneShotCmdMgr& cmd_mgr, int scale = 12);
+    void render(vk::CommandBuffer cmd_buf, targets::TerrainChunk& prev);
 
-    void reset() {
-        m_currentImage = 0;
-        m_frequency = 1;
+    void reset(glm::vec2 pos, glm::vec2 extent, float frequency = 1, float amplitude = 1) {
+        pushConstant.start = pos;
+        pushConstant.extent = extent;
+        pushConstant.frequency = frequency;
+        pushConstant.amplitude = amplitude;
+        pushConstant.octave = 0;
     }
+
+    void nextOctave() {
+        pushConstant.frequency *= 2;
+        pushConstant.amplitude /= 2;
+        pushConstant.octave++;
+    }
+
+    void setPower(float pow) { pushConstant.pow = pow; }
+
 private: 
     void upscale(vk::CommandBuffer cmd_buf);
     
 private:
     etna::GraphicsPipeline pipeline;
-    etna::Image m_images[2];
     etna::Sampler m_sampler;
+    struct PushConstant {
+        glm::vec2 start;
+        glm::vec2 extent;
+        float frequency = 1;
+        float amplitude = 1;
+        float pow = 1;
+        glm::uint octave;
 
-    vk::Extent2D m_extent;
-    unsigned m_currentImage = 0;
-
-    unsigned m_frequency = 1;
+    } pushConstant;
 };
 
+void generate_chunk(vk::CommandBuffer cmd_buf, PerlinPipeline& pipeline, targets::TerrainChunk& dst, targets::TerrainChunk& tmp, float frequency, std::size_t octaves);
+
 }
+
 // static_assert(Pipeline<pipes::PerlinPipeline>, "Perlin must be valid pipeline");

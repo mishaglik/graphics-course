@@ -17,17 +17,9 @@ void
 PerlinPipeline::allocate()
 {
     // auto& ctx = etna::get_context();
-    auto& ctx = etna::get_context();
     m_sampler = etna::Sampler({
         .filter = vk::Filter::eLinear,
         .name = "perlinSample",
-    });
-
-    pipeline = ctx.getPipelineManager().createGraphicsPipeline("perlin_shader", {
-        .fragmentShaderOutput = {
-            .colorAttachmentFormats = RenderTarget::COLOR_ATTACHMENT_FORMATS,
-            .depthAttachmentFormat = RenderTarget::DEPTH_ATTACHMENT_FORMAT
-        },
     });
 }
 
@@ -53,10 +45,22 @@ PerlinPipeline::setup()
     pipeline = pipelineManager.createGraphicsPipeline(
     "perlin_shader",
     etna::GraphicsPipeline::CreateInfo{
-      .fragmentShaderOutput =
+        .blendingConfig = {
+            .attachments = {RenderTarget::N_COLOR_ATTACHMENTS, 
+                vk::PipelineColorBlendAttachmentState{
+                    .blendEnable = vk::False,
+                    .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+                                        vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
+                }
+            },
+            .logicOpEnable = false,
+            .logicOp = {},
+            .blendConstants = {},
+        },
+        .fragmentShaderOutput =
         {
-          .colorAttachmentFormats = RenderTarget::COLOR_ATTACHMENT_FORMATS,
-          .depthAttachmentFormat  = RenderTarget::DEPTH_ATTACHMENT_FORMAT,
+            .colorAttachmentFormats = RenderTarget::COLOR_ATTACHMENT_FORMATS,
+            .depthAttachmentFormat  = RenderTarget::DEPTH_ATTACHMENT_FORMAT,
         },
     });
 
@@ -93,6 +97,8 @@ PerlinPipeline::render(vk::CommandBuffer cmd_buf, targets::TerrainChunk& dst, ui
         cmd_buf,
         {
             etna::Binding{0, dst.getImage(0).genBinding(m_sampler.get(), vk::ImageLayout::eGeneral)},
+            etna::Binding{1, dst.getImage(1).genBinding(m_sampler.get(), vk::ImageLayout::eGeneral)},
+            etna::Binding{2, dst.getImage(2).genBinding(m_sampler.get(), vk::ImageLayout::eGeneral)},
         }
     );
         

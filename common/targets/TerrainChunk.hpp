@@ -9,7 +9,7 @@ class TerrainChunk {
 public:
     static const std::vector<vk::Format> COLOR_ATTACHMENT_FORMATS;
     static const vk::Format              DEPTH_ATTACHMENT_FORMAT  = vk::Format::eUndefined;
-    static const constexpr int N_COLOR_ATTACHMENTS = 1;
+    static const constexpr int N_COLOR_ATTACHMENTS = 3;
 
     const std::vector<etna::RenderTargetState::AttachmentParams>& getColorAttachments() { return color_attachments; }
 

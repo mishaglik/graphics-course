@@ -72,6 +72,9 @@ public:
   Texture::Id getStubTexture();
   Texture::Id getStubRedTexture();
   Texture::Id getStubBlueTexture();
+
+  Texture::Id loadTexture(std::filesystem::path);
+
 private:
 
   std::optional<tinygltf::Model> loadModel(std::filesystem::path path);

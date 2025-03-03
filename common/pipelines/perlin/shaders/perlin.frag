@@ -3,6 +3,8 @@
 #extension GL_GOOGLE_include_directive : require
 
 layout(location = 0) out float out_fragColor;
+layout(location = 1) out vec4 out_fragNormal;
+layout(location = 2) out vec4 out_fragTPxx;
 
 layout (location = 0 ) in VS_OUT
 {

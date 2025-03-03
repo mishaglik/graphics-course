@@ -17,12 +17,15 @@ layout(push_constant) uniform params_t
 
 
 layout(binding = 0) uniform sampler2D heightMap;
+layout(binding = 1) uniform sampler2D normalMap;
+layout(binding = 2) uniform sampler2D tprrMap;
 
 layout(location = 0) in vec2 TextureCoord[];
 
 layout (location = 0) out TSE_OUT
 {
   vec2 texCoord;
+  vec2 worldCoord;
   vec4 normal;
   float height;
 } surf;
@@ -76,6 +79,7 @@ void main()
     surf.texCoord = t;
     surf.height   = texture(heightMap, t).r;
     surf.normal = -normal;
-
+    surf.worldCoord = p.xz;
+    
     gl_Position = params.mProjView * vec4(p.xyz, 1);
 }

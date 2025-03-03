@@ -131,6 +131,12 @@ TerrainPipeline::setup()
           .depthAttachmentFormat = RenderTarget::DEPTH_ATTACHMENT_FORMAT,
         },
     });
+
+    tilingSampler = etna::Sampler({
+      .filter = vk::Filter::eLinear,
+      .addressMode = vk::SamplerAddressMode::eRepeat,
+      .name = "tilingSampler",
+    });
 }
 
 void 
@@ -179,6 +185,19 @@ TerrainPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer& target, con
   
   cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, currentPipeline.getVkPipeline());
   
+  auto terrainShader = etna::get_shader_program("terrain_shader");
+  set1 = etna::create_descriptor_set(
+    terrainShader.getDescriptorLayoutId(1),
+    cmd_buf,
+    {
+      etna::Binding{0, (*ctx.sceneMgr)[m_textures[0]].image.genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+      etna::Binding{1, (*ctx.sceneMgr)[m_textures[1]].image.genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+      etna::Binding{2, (*ctx.sceneMgr)[m_textures[2]].image.genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+      etna::Binding{3, (*ctx.sceneMgr)[m_textures[3]].image.genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+      etna::Binding{4, (*ctx.sceneMgr)[m_textures[4]].image.genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)}
+    }
+  );
+
   for(int i = 0; i < activeLayers; ++i) {
     auto& level = levels[i];
     for(auto& chunk: level.getChunks())
@@ -221,21 +240,25 @@ TerrainPipeline::regenerateTerrainIfNeeded(vk::CommandBuffer cmd_buf, glm::vec2 
 void 
 TerrainPipeline::drawChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& cur_chunk, uint8_t chunk_mask)
 {
-  auto& hmap = cur_chunk.getImage(0); 
-  
   auto terrainShader = etna::get_shader_program("terrain_shader");
 
   auto set = etna::create_descriptor_set(
     terrainShader.getDescriptorLayoutId(0),
     cmd_buf,
-    {etna::Binding{0, hmap.genBinding(terrainGenerator.getSampler().get(), vk::ImageLayout::eShaderReadOnlyOptimal)}}
+    {
+      etna::Binding{0, cur_chunk.getImage(0).genBinding(terrainGenerator.getSampler().get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+      etna::Binding{1, cur_chunk.getImage(1).genBinding(terrainGenerator.getSampler().get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+      etna::Binding{2, cur_chunk.getImage(2).genBinding(terrainGenerator.getSampler().get(), vk::ImageLayout::eShaderReadOnlyOptimal)}
+    }
   );
+
+  
 
   cmd_buf.bindDescriptorSets(
     vk::PipelineBindPoint::eGraphics,
     pipeline.getVkPipelineLayout(), //NOTE - Both pipelines share same layout. 
     0,
-    {set.getVkSet()},
+    {set.getVkSet(), set1.getVkSet()},
     {}
   );
 
@@ -254,7 +277,8 @@ TerrainPipeline::drawChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& cur
           pipeline.getVkPipelineLayout(), 
           vk::ShaderStageFlagBits::eVertex |
           vk::ShaderStageFlagBits::eTessellationEvaluation |
-          vk::ShaderStageFlagBits::eTessellationControl,
+          vk::ShaderStageFlagBits::eTessellationControl |
+          vk::ShaderStageFlagBits::eFragment,
           0, 
           sizeof(pushConstants), &pushConstants
         );
@@ -265,5 +289,15 @@ TerrainPipeline::drawChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& cur
     }
   }
 }
+
+void TerrainPipeline::loadTextures(SceneManager& scene_mgr)
+{
+  m_textures[0] = scene_mgr.loadTexture(GRAPHICS_COURSE_RESOURCES_ROOT "/textures/terrain/" "grass.jpg");
+  m_textures[1] = scene_mgr.loadTexture(GRAPHICS_COURSE_RESOURCES_ROOT "/textures/terrain/" "sand.jpg");
+  m_textures[2] = scene_mgr.loadTexture(GRAPHICS_COURSE_RESOURCES_ROOT "/textures/terrain/" "snow.jpg");
+  m_textures[3] = scene_mgr.loadTexture(GRAPHICS_COURSE_RESOURCES_ROOT "/textures/terrain/" "rock.jpg");
+  m_textures[4] = scene_mgr.loadTexture(GRAPHICS_COURSE_RESOURCES_ROOT "/textures/terrain/" "ground.jpg");
+}
+
 
 } /* namespace pipes */

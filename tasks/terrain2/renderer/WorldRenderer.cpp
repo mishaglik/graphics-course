@@ -55,6 +55,7 @@ void WorldRenderer::loadScene(std::filesystem::path path)
     sceneMgr->selectScene(path);
   }
   staticMeshPipeline2.reserve(sceneMgr->getRenderElements().size());
+  terrainPipeline2.loadTextures(*sceneMgr);
 }
 
 void WorldRenderer::loadShaders()

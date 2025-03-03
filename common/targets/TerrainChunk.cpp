@@ -6,6 +6,8 @@ namespace targets {
 
 const std::vector<vk::Format> TerrainChunk::COLOR_ATTACHMENT_FORMATS = {
   vk::Format::eR32Sfloat,
+  vk::Format::eR8G8B8A8Snorm,
+  vk::Format::eR8G8B8A8Snorm,
 };
 
 void
@@ -13,6 +15,8 @@ TerrainChunk::allocate(glm::uvec2 extent)
 {
   std::array<const char*, N_COLOR_ATTACHMENTS> names = {
     "terrain_height",
+    "terrain_normal",
+    "terrain_temp  ",
   };
   resolution = extent;
 

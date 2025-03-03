@@ -32,7 +32,7 @@ Cliplevel::update(vk::CommandBuffer cmd_buf, pipes::PerlinPipeline& pipeline, gl
             chunk.setPosition(static_cast<glm::vec2>(m_pos + glm::ivec2{i, j}) * m_step);
             generate_chunk(cmd_buf, pipeline, chunk, tmp, frequency, octaves);
             chunk.setState(cmd_buf,
-                vk::PipelineStageFlagBits2::eTessellationEvaluationShader, 
+                vk::PipelineStageFlagBits2::eTessellationEvaluationShader | vk::PipelineStageFlagBits2::eFragmentShader, 
                 vk::AccessFlagBits2::eShaderSampledRead, 
                 vk::ImageLayout::eShaderReadOnlyOptimal, 
                 vk::ImageAspectFlagBits::eColor

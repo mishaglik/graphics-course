@@ -1,14 +1,13 @@
 #pragma once
 
 #include "etna/ComputePipeline.hpp"
-#include "pipelines/Pipeline.hpp"
-#include "pipelines/RenderContext.hpp"
 
 #include <etna/GraphicsPipeline.hpp>
 #include <etna/Image.hpp>
 #include <etna/Sampler.hpp>
 
 #include "targets/TerrainChunk.hpp"
+#include "wsi/Keyboard.hpp"
 
 
 namespace pipes {
@@ -16,7 +15,7 @@ namespace pipes {
 class PerlinPipeline {
 public:
     using RenderTarget = targets::TerrainChunk;
-    static_assert(RenderTarget::N_COLOR_ATTACHMENTS == 1, "Perlin renders into single layer");
+    static_assert(RenderTarget::N_COLOR_ATTACHMENTS == 3, "Perlin renders into single layer");
 
     PerlinPipeline() {}
     

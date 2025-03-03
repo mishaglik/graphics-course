@@ -24,6 +24,8 @@ public:
     void allocate();
     
     void loadShaders();
+    
+    void loadTextures(SceneManager& scene_mgr);
 
     void setup();
     
@@ -75,6 +77,10 @@ private:
 
     uint64_t heightMapResolution = 256;
     static const uint64_t MAX_TESCELLATION = 64; //FIXME: Use vulkan info
+
+    std::array<Texture::Id, 5> m_textures;
+    etna::DescriptorSet set1;
+    etna::Sampler tilingSampler;
 };
 
 }

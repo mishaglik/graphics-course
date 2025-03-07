@@ -186,7 +186,7 @@ StaticMeshPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer& target, 
       cmd_buf.pushConstants<PushConstants>(
         pipeline.getVkPipelineLayout(), vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, {pushConst2M});
       cmd_buf.drawIndexed(
-        relem.indexCount, nInstances[j], relem.indexOffset, relem.vertexOffset, firstInstance);
+        relem.indexCount, static_cast<uint32_t>(nInstances[j]), relem.indexOffset, relem.vertexOffset, static_cast<uint32_t>(firstInstance));
       firstInstance += nInstances[j];
     }
   }

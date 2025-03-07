@@ -12,17 +12,17 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        cxx: [g++-12, clang++-15]
+        cxx: [g++-12, clang++-18]
         build_type: [Debug, RelWithDebInfo, Release]
         include:
           - cxx: g++-12
             install: sudo apt install g++-12
-          - cxx: clang++-15
+          - cxx: clang++-18
             cxxflags: -stdlib=libc++
-            install: sudo apt install clang-15 libc++-15-dev libc++abi-15-dev
+            install: sudo apt install clang-18 libc++-18-dev libc++abi-18-dev
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v4.0.0
 
     - name: Prepare Vulkan SDK
       uses: humbletim/install-vulkan-sdk@v1.1.1
@@ -44,7 +44,7 @@ jobs:
 
     - name: Set up CPM cache
       id: cache-cpm
-      uses: actions/cache@v4
+      uses: actions/cache@v4.0.0
       with:
         path: ~/cpm-cache
         key: ${{ runner.os }}-cpm-${{ hashFiles('**/') }}

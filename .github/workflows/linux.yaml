@@ -22,7 +22,7 @@ jobs:
             install: sudo apt install clang-18 libc++-18-dev libc++abi-18-dev
 
     steps:
-    - uses: actions/checkout@v4.0.0
+    - uses: actions/checkout@v4
 
     - name: Prepare Vulkan SDK
       uses: humbletim/install-vulkan-sdk@v1.1.1
@@ -43,7 +43,7 @@ jobs:
 
     - name: Set up CPM cache
       id: cache-cpm
-      uses: actions/cache@v4.0.0
+      uses: actions/cache@v4
       with:
         path: ~/cpm-cache
         key: ${{ runner.os }}-cpm-${{ hashFiles('**/') }}

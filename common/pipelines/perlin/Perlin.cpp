@@ -155,7 +155,7 @@ void generate_chunk(vk::CommandBuffer cmd_buf, PerlinPipeline& pipeline, targets
     );
     etna::flush_barriers(cmd_buf);
 
-    pipeline.render(cmd_buf, dst, octaves);
+    pipeline.render(cmd_buf, dst, static_cast<uint32_t>(octaves));
     #endif
 }
 

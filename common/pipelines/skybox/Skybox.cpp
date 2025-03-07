@@ -43,7 +43,7 @@ SkyboxPipeline::allocate()
         size_t size = static_cast<std::size_t>(width * height * 4);
         etna::BlockingTransferHelper bth({.stagingSize = size});
 
-        bth.uploadImage(*ctx.createOneShotCmdMgr(), texture, 0, i, std::span<const std::byte>(reinterpret_cast<const std::byte*>(imageBytes), static_cast<uint32_t>(size)));
+        bth.uploadImage(*ctx.createOneShotCmdMgr(), texture, 0, static_cast<uint32_t>(i), std::span<const std::byte>(reinterpret_cast<const std::byte*>(imageBytes), size));
     }
 }
 

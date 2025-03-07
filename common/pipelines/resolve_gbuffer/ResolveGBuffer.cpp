@@ -10,7 +10,10 @@
 #include <imgui.h>
 
 #include "stb_image.h"
-
+#include <math.h>
+#ifndef M_PIf
+#define M_PIf 3.14159265358979323846f
+#endif
 namespace pipes {
 
 void 

@@ -80,7 +80,7 @@ PerlinPipeline::debugInput(const Keyboard& /*kb*/)
 }
 #define NO_GRAPHIC_PIPELINE
 void 
-PerlinPipeline::render(vk::CommandBuffer cmd_buf, targets::TerrainChunk& dst, uint octaves)
+PerlinPipeline::render(vk::CommandBuffer cmd_buf, targets::TerrainChunk& dst, uint32_t octaves)
 {
     ETNA_PROFILE_GPU(cmd_buf, pipelines_perlin_upscale);
     pushConstant.octave = octaves;

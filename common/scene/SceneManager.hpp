@@ -123,7 +123,7 @@ private:
 private:
   tinygltf::TinyGLTF loader;
   std::unique_ptr<etna::OneShotCmdMgr> oneShotCommands;
-  etna::BlockingTransferHelper transferHelper;
+  etna::BlockingTransferHelper m_transferHelper;
 
   
   std::vector<RenderElement> renderElements;

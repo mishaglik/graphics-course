@@ -16,7 +16,7 @@
 
 SceneManager::SceneManager()
   : oneShotCommands{etna::get_context().createOneShotCmdMgr()}
-  , transferHelper{etna::BlockingTransferHelper::CreateInfo{.stagingSize = 4096 * 4096 * 4}}
+  , m_transferHelper{etna::BlockingTransferHelper::CreateInfo{.stagingSize = 4096 * 4096 * 4}}
 {
 }
 
@@ -494,8 +494,8 @@ void SceneManager::uploadData(
     .name = "unifiedIbuf",
   });
 
-  transferHelper.uploadBuffer<Vertex>(*oneShotCommands, unifiedVbuf, 0, vertices);
-  transferHelper.uploadBuffer<std::uint32_t>(*oneShotCommands, unifiedIbuf, 0, indices);
+  m_transferHelper.uploadBuffer<Vertex>(*oneShotCommands, unifiedVbuf, 0, vertices);
+  m_transferHelper.uploadBuffer<std::uint32_t>(*oneShotCommands, unifiedIbuf, 0, indices);
 }
 
 void SceneManager::selectScene(std::filesystem::path path)
@@ -649,8 +649,8 @@ void SceneManager::processMaterials(const tinygltf::Model& model) {
       m.baseColor = glm::vec4(1.f, 1.f, 1.f, 1.f);
     }
 
-    m.EMR_Factor.g = material.pbrMetallicRoughness.roughnessFactor;
-    m.EMR_Factor.b = material.pbrMetallicRoughness.metallicFactor;
+    m.EMR_Factor.g = static_cast<glm::vec4::value_type>(material.pbrMetallicRoughness.roughnessFactor);
+    m.EMR_Factor.b = static_cast<glm::vec4::value_type>(material.pbrMetallicRoughness.metallicFactor);
 
     if (material.pbrMetallicRoughness.baseColorTexture.index != -1) {
       m.baseColorTexture = static_cast<decltype(m.baseColorTexture)>(material.pbrMetallicRoughness.baseColorTexture.index);

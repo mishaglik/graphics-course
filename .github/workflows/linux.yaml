@@ -31,9 +31,8 @@ jobs:
         cache: true
 
     - name: Install CMake
-      uses: ssrobins/install-cmake@v1
-      with:
-        version: 3.30.2
+      run: | 
+        sudo apt install cmake
 
     - name: Create Build Environment
       run: |

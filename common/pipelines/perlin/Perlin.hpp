@@ -31,7 +31,7 @@ public:
 
     etna::Sampler& getSampler() { return m_sampler; }
 
-    void render(vk::CommandBuffer cmd_buf, targets::TerrainChunk&, uint octaves);
+    void render(vk::CommandBuffer cmd_buf, targets::TerrainChunk&, uint32_t octaves);
 
     void reset(glm::vec2 pos, glm::vec2 extent, float frequency = 1, float amplitude = 1) {
         pushConstant.start = pos;

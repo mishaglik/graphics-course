@@ -262,16 +262,16 @@ TerrainPipeline::drawChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& cur
     {}
   );
 
-  const size_t nChunks = std::max(2ul, heightMapResolution / MAX_TESCELLATION);
+  const size_t nChunks = std::max(static_cast<uint64_t>(2ul), heightMapResolution / MAX_TESCELLATION);
   const size_t nHalfChunks = nChunks / 2;
 
   pushConstants.extent = cur_chunk.getExtentPos() / float(nChunks);
   pushConstants.degree = 256;
-  pushConstants.nHalfChunks = nHalfChunks;
+  pushConstants.nHalfChunks = static_cast<glm::uint>(nHalfChunks);
   pushConstants.base = cur_chunk.getStartPos();
   for(size_t i = 0; i < 2; ++i) {
     for(size_t j = 0; j < 2; ++j) {
-      pushConstants.subChunk = 2*i+j;
+      pushConstants.subChunk = static_cast<glm::uint>(2*i+j);
       if((chunk_mask & 1) != 0) {
         cmd_buf.pushConstants(
           pipeline.getVkPipelineLayout(), 
@@ -283,7 +283,7 @@ TerrainPipeline::drawChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& cur
           sizeof(pushConstants), &pushConstants
         );
         
-        cmd_buf.draw(4, nHalfChunks * nHalfChunks, 0, 0);
+        cmd_buf.draw(4, static_cast<uint32_t>(nHalfChunks * nHalfChunks), 0, 0);
       }
       chunk_mask >>= 1;
     }

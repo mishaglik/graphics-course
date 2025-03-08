@@ -42,6 +42,10 @@ public:
 
     void setPower(float pow) { pushConstant.pow = pow; }
 
+    void setFull() { pushConstant.texStart = {0.f, 0.f}; pushConstant.texExtent = {1.f, 1.f};}
+    void setSubchunk(glm::uvec2 index) { pushConstant.texExtent = {.25f, .25f}; pushConstant.texStart = static_cast<glm::vec2>(index) / 4.f;}
+    void setSubregion(glm::vec2 tex_start, glm::vec2 tex_extent) { pushConstant.texExtent = tex_extent; pushConstant.texStart = tex_start; }
+
 private: 
     void upscale(vk::CommandBuffer cmd_buf);
     
@@ -56,11 +60,13 @@ private:
         float amplitude = 1;
         float pow = 1.25;
         glm::uint octave;
-
+        glm::vec2 texStart ;
+        glm::vec2 texExtent;
     } pushConstant;
 };
 
 void generate_chunk(vk::CommandBuffer cmd_buf, PerlinPipeline& pipeline, targets::TerrainChunk& dst, targets::TerrainChunk& tmp, float frequency, std::size_t octaves);
+void update_chunk(vk::CommandBuffer cmd_buf, PerlinPipeline& pipeline, targets::TerrainChunk& dst, targets::TerrainChunk& chk, glm::uvec2 index, float frequency, std::size_t octaves);
 
 }
 

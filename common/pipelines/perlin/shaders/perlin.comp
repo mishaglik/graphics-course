@@ -104,7 +104,7 @@ void main(void)
 {  
   ivec2 uv = ivec2(gl_GlobalInvocationID.xy);
   float out_fragColor = 0.;
-  vec2 imcoord = vec2(uv) / (imageSize(resultImage).xy - ivec2(1, 1));
+  vec2 imcoord = vec2(uv) / (imageSize(resultImage).xy);
   const vec2 worldCoord = imcoord * pushConstant.extent + pushConstant.start;
 
   float frequency = pushConstant.frequency;

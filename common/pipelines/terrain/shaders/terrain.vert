@@ -13,7 +13,8 @@ layout(push_constant) uniform params_t
   mat4 mProjView;
   vec3 camPos;
   int degree;
-  float a,b;
+  float seaLevel;
+  float maxHeight;
   uint nChunks;
   uint subChunk;
 } params;
@@ -40,7 +41,7 @@ void main() {
   if (gl_VertexIndex == 3) 
     xy += vec2( 1,  1);
 
-  vOut.texCoord = xy / params.nChunks / 2;
+  vOut.texCoord = (xy + params.base / params.extent) / params.nChunks / 8;
   xy = params.base + xy * params.extent;
   gl_Position = vec4(xy.x, 0, xy.y, 1);
 }

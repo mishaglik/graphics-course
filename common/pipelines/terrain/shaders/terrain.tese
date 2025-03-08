@@ -15,7 +15,6 @@ layout(push_constant) uniform params_t
   uint subChunk;
 } params;
 
-
 layout(binding = 0) uniform sampler2D heightMap;
 layout(binding = 1) uniform sampler2D normalMap;
 layout(binding = 2) uniform sampler2D tprrMap;

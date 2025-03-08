@@ -37,6 +37,7 @@ TerrainChunk::allocate(glm::uvec2 extent)
             .image = color_buffer[i].get(),
             .view  = color_buffer[i].getView({}),
             .imageAspect = vk::ImageAspectFlagBits::eColor,
+            .loadOp = vk::AttachmentLoadOp::eLoad,
         };
     }
 

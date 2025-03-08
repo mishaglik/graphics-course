@@ -197,29 +197,32 @@ TerrainPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer& target, con
       etna::Binding{4, (*ctx.sceneMgr)[m_textures[4]].image.genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)}
     }
   );
-
   for(int i = 0; i < activeLayers; ++i) {
     auto& level = levels[i];
-    for(auto& chunk: level.getChunks())
-    {
-      uint8_t mask = 0;
-      if (i != 0) {
-        glm::ivec2 idx = chunk.iPos * 2;
-        glm::ivec2 bIdx = levels[i-1].getIPos();
-        if(idx.x - bIdx.x >  0) mask |= 0b1100;
-        if(idx.x - bIdx.x >  1) mask |= 0b1111;
-        if(idx.x - bIdx.x < -2) mask |= 0b0011;
-        if(idx.x - bIdx.x < -3) mask |= 0b1111;
+    for(unsigned x = 0; x < 4; ++x) {
+      for(unsigned y = 0; y < 4; ++y) {
+        int dx = ((x - level.getIPos().x) % 4 + 6) % 4;
+        int dy = ((y - level.getIPos().y) % 4 + 6) % 4;
+        uint8_t mask = 0;
+        if (i != 0) {
+          glm::ivec2 idx = (level.getChunk().iPos + glm::ivec2{dx, dy}) * 2;
+          glm::ivec2 bIdx = levels[i-1].getIPos();
+          if(idx.x - bIdx.x >  0) mask |= 0b1100;
+          if(idx.x - bIdx.x >  1) mask |= 0b1111;
+          if(idx.x - bIdx.x < -2) mask |= 0b0011;
+          if(idx.x - bIdx.x < -3) mask |= 0b1111;
 
-        if(idx.y - bIdx.y >  0) mask |= 0b1010;
-        if(idx.y - bIdx.y >  1) mask |= 0b1111;
-        if(idx.y - bIdx.y < -2) mask |= 0b0101;
-        if(idx.y - bIdx.y < -3) mask |= 0b1111;
-      } else {
-        mask = 0xF;
+          if(idx.y - bIdx.y >  0) mask |= 0b1010;
+          if(idx.y - bIdx.y >  1) mask |= 0b1111;
+          if(idx.y - bIdx.y < -2) mask |= 0b0101;
+          if(idx.y - bIdx.y < -3) mask |= 0b1111;
+        } else {
+          mask = 0xF;
+        }
+        // drawChunk(cmd_buf, chunk, mask);
+        drawSubChunk(cmd_buf, level.getChunk(), {dx, dy}, mask);
       }
-      drawChunk(cmd_buf, chunk, mask);
-    }
+    } 
   }
 
   return target;
@@ -246,9 +249,9 @@ TerrainPipeline::drawChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& cur
     terrainShader.getDescriptorLayoutId(0),
     cmd_buf,
     {
-      etna::Binding{0, cur_chunk.getImage(0).genBinding(terrainGenerator.getSampler().get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
-      etna::Binding{1, cur_chunk.getImage(1).genBinding(terrainGenerator.getSampler().get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
-      etna::Binding{2, cur_chunk.getImage(2).genBinding(terrainGenerator.getSampler().get(), vk::ImageLayout::eShaderReadOnlyOptimal)}
+      etna::Binding{0, cur_chunk.getImage(0).genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+      etna::Binding{1, cur_chunk.getImage(1).genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+      etna::Binding{2, cur_chunk.getImage(2).genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)}
     }
   );
 
@@ -269,6 +272,59 @@ TerrainPipeline::drawChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& cur
   pushConstants.degree = 256;
   pushConstants.nHalfChunks = static_cast<glm::uint>(nHalfChunks);
   pushConstants.base = cur_chunk.getStartPos();
+
+  for(size_t i = 0; i < 2; ++i) {
+    for(size_t j = 0; j < 2; ++j) {
+      pushConstants.subChunk = static_cast<glm::uint>(2*i+j);
+      if((chunk_mask & 1) != 0) {
+        cmd_buf.pushConstants(
+          pipeline.getVkPipelineLayout(), 
+          vk::ShaderStageFlagBits::eVertex |
+          vk::ShaderStageFlagBits::eTessellationEvaluation |
+          vk::ShaderStageFlagBits::eTessellationControl |
+          vk::ShaderStageFlagBits::eFragment,
+          0, 
+          sizeof(pushConstants), &pushConstants
+        );
+        
+        cmd_buf.draw(4, static_cast<uint32_t>(nHalfChunks * nHalfChunks), 0, 0);
+      }
+      chunk_mask >>= 1;
+    }
+  }
+}
+
+void 
+TerrainPipeline::drawSubChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& glob_chunk, glm::uvec2 index, uint8_t chunk_mask)
+{
+  auto terrainShader = etna::get_shader_program("terrain_shader");
+
+  auto set = etna::create_descriptor_set(
+    terrainShader.getDescriptorLayoutId(0),
+    cmd_buf,
+    {
+      etna::Binding{0, glob_chunk.getImage(0).genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+      etna::Binding{1, glob_chunk.getImage(1).genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+      etna::Binding{2, glob_chunk.getImage(2).genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)}
+    }
+  );
+
+  cmd_buf.bindDescriptorSets(
+    vk::PipelineBindPoint::eGraphics,
+    pipeline.getVkPipelineLayout(), //NOTE - Both pipelines share same layout. 
+    0,
+    {set.getVkSet(), set1.getVkSet()},
+    {}
+  );
+
+  const size_t nChunks = std::max(static_cast<uint64_t>(2ul), heightMapResolution / MAX_TESCELLATION);
+  const size_t nHalfChunks = nChunks / 2;
+
+  pushConstants.extent = glob_chunk.getExtentPos() / float(nChunks) / 4.f;
+  pushConstants.degree = 256;
+  pushConstants.nHalfChunks = static_cast<glm::uint>(nHalfChunks);
+  pushConstants.base = glob_chunk.getStartPos() + glm::vec2(index) * glob_chunk.getExtentPos()  / 4.f;
+
   for(size_t i = 0; i < 2; ++i) {
     for(size_t j = 0; j < 2; ++j) {
       pushConstants.subChunk = static_cast<glm::uint>(2*i+j);

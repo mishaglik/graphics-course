@@ -4,11 +4,11 @@
 #include "pipelines/perlin/Perlin.hpp"
 #include "targets/TerrainChunk.hpp"
 
-namespace pipelines::terrain {
+namespace pipes::terrain {
 
 class Cliplevel {
 public:
-    std::span<targets::TerrainChunk, 16> getChunks() { return m_chunks; }
+    targets::TerrainChunk& getChunk() { return m_chunk; }
 
     void allocate(glm::vec2 step, std::size_t resolution);
 
@@ -18,7 +18,8 @@ public:
 private:
     glm::ivec2 m_pos = {};
     glm::vec2 m_step;
-    std::array<targets::TerrainChunk, 16> m_chunks;
+    std::array<glm::ivec2, 16> m_ipos;
+    targets::TerrainChunk m_chunk;
 };
 
 }

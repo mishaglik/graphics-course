@@ -120,7 +120,6 @@ void main(void) {
     amplitude /= 2;
   }
   out_fragColor /= 2;
-  out_fragColor = clamp((worldCoord.x + abs(worldCoord.y)) / 60, 0, 1);
   out_fragTPxx = vec4(temperature(0.1 * pushConstant.frequency * worldCoord), roads(pushConstant.frequency * worldCoord), 0, 0);
   
   return;

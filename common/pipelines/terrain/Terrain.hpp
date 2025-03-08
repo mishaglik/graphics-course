@@ -41,6 +41,7 @@ private:
     void regenerateTerrainIfNeeded(vk::CommandBuffer cmd_buf, glm::vec2 pos);
     
     void drawChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& cur_chunk, uint8_t chunk_mask = 0xF);
+    void drawSubChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& glob_chunk, glm::uvec2 index, uint8_t chunk_mask = 0xF);
 
 
 private:
@@ -61,13 +62,13 @@ private:
     etna::GraphicsPipeline pipelineDebug;
     
     PerlinPipeline terrainGenerator;
-    static const std::size_t N_CLIP_LEVELS = 5;
-    std::array<pipelines::terrain::Cliplevel, N_CLIP_LEVELS> levels;
+    static const std::size_t N_CLIP_LEVELS = 2;
+    std::array<pipes::terrain::Cliplevel, N_CLIP_LEVELS> levels;
 
     targets::TerrainChunk tmp;
 
     int terrainScale = 7;
-    int activeLayers = 3;
+    int activeLayers = 1;
     bool wireframe = false;
 
     float startFrequency = 0.003f;

@@ -20,6 +20,8 @@ layout(push_constant) uniform params
   float amplitude;
   float pow;
   uint octave;
+  vec2 texStart;
+  vec2 texExtent;
 } pushConstant;
 
 
@@ -41,11 +43,11 @@ float noise(vec2 p){
 }
 
 // Add octave to work as seed for permutator
-vec3 permute(vec3 x) { return mod(((x*34.0)+1.0 + pushConstant.octave)*x, 289.0); }
+vec3 permute(vec3 x, float seed) { return mod(((x*34.0)+1.0+seed)*x, 289.0); }
 
 // Simplex 2D noise.
 // Code from internet
-float snoise(vec2 v){
+float snoise(vec2 v, float seed){
   const vec4 C = vec4(0.211324865405187, 0.366025403784439,
            -0.577350269189626, 0.024390243902439);
   vec2 i  = floor(v + dot(v, C.yy) );
@@ -55,8 +57,8 @@ float snoise(vec2 v){
   vec4 x12 = x0.xyxy + C.xxzz;
   x12.xy -= i1;
   i = mod(i, 289.0);
-  vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 ))
-  + i.x + vec3(0.0, i1.x, 1.0 ));
+  vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 ), seed)
+  + i.x + vec3(0.0, i1.x, 1.0 ), seed);
   vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy),
     dot(x12.zw,x12.zw)), 0.0);
   m = m*m ;
@@ -72,52 +74,55 @@ float snoise(vec2 v){
   return 130.0 * dot(m, g);
 }
 
-vec2 hash( vec2 p ) // replace this by something better
+float height(vec2 p)
 {
-	p = vec2( dot(p,vec2(127.1,311.7)), dot(p,vec2(269.5,183.3)) );
-	return -1.0 + 2.0*fract(sin(p)*43758.5453123);
-}
-
-float unoise( in vec2 p )
-{
-  const float K1 = 0.366025404; // (sqrt(3)-1)/2;
-  const float K2 = 0.211324865; // (3-sqrt(3))/6;
-
-	vec2  i = floor( p + (p.x+p.y)*K1 );
-  vec2  a = p - i + (i.x+i.y)*K2;
-  float m = step(a.y,a.x); 
-  vec2  o = vec2(m,1.0-m);
-  vec2  b = a - o + K2;
-	vec2  c = a - 1.0 + 2.0*K2;
-  vec3  h = max( 0.5-vec3(dot(a,a), dot(b,b), dot(c,c) ), 0.0 );
-	vec3  n = h*h*h*h*vec3( dot(a,hash(i+0.0)), dot(b,hash(i+o)), dot(c,hash(i+1.0)));
-  return dot( n, vec3(70.0) );
-}
-
-float mainNoise(vec2 p)
-{
-  //   noise = min(noise, 1.45-noise);
+  float noise = snoise(p, 0);
+  // noise = min(noise, 1.45-noise);
   // noise = (0.4 - abs(noise));
-  return pow((1 + snoise(p)) / 2, pushConstant.pow);
+  // if(noise < 0.3)
+  //   noise = 0;
+  return clamp(pow((1 + noise) / 2, pushConstant.pow), 0, 1);
 }
 
-void main(void)
-{  
-  
+float temperature(vec2 p)
+{
+  float noise = snoise(p, 1);
+  // noise = min(noise, 1.45-noise);
+  // noise = (0.4 - abs(noise));
+  // if(noise < 0.3)
+  //   noise = 0;
+  return clamp(pow((1 + noise) / 2, pushConstant.pow), 0, 1);
+}
+
+float roads(vec2 p)
+{
+  float noise = snoise(p, 2);
+  // noise = min(noise, 1.45-noise);
+  noise = (0.4 - abs(noise)) / 0.4;
+  noise = pow(noise, 3);
+  noise = 10 * (noise - 0.9);
+  return clamp(noise, 0, 1);
+}
+
+const float resolution = 256;
+
+void main(void) {
   out_fragColor = 0.;
-  const vec2 worldCoord = surf.texCoord * pushConstant.extent + pushConstant.start;
-  out_fragColor = (sin(worldCoord.x + worldCoord.y)+1)/2;
-  return;
+  vec2 imcoord = surf.texCoord;
+  const vec2 worldCoord = imcoord * pushConstant.extent + pushConstant.start;
+
   float frequency = pushConstant.frequency;
   float amplitude = 1;
-  float cumAmplitude = 0;
   for(int i = 0; i < pushConstant.octave; ++i) {
-    float noise = mainNoise(frequency * worldCoord);
+    float noise = height(frequency * worldCoord);
     out_fragColor += amplitude * noise;
-    cumAmplitude += amplitude;
     frequency *= 2;
     amplitude /= 2;
   }
+  out_fragColor /= 2;
+  out_fragColor = clamp((worldCoord.x + abs(worldCoord.y)) / 60, 0, 1);
+  out_fragTPxx = vec4(temperature(0.1 * pushConstant.frequency * worldCoord), roads(pushConstant.frequency * worldCoord), 0, 0);
   
+  return;
 
 }

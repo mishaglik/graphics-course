@@ -3,3 +3,4 @@
 #include "pipelines/tonemap/Tonemap.hpp"
 #include "pipelines/skybox/Skybox.hpp"
 #include "pipelines/static_mesh/StaticMesh.hpp"
+#include "pipelines/aa/AA.hpp"

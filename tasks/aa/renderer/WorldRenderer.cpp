@@ -28,7 +28,8 @@ void WorldRenderer::allocateResources(glm::uvec2 swapchain_resolution)
   terrainPipeline2   .allocate();
   skyboxPipeline2    .allocate();
   resolveGPipeline2  .allocate();
-  tonemapPipeline2   .allocate();
+  // tonemapPipeline2   .allocate();
+  aaPipeline2        .allocate();
 
   defaultSampler = etna::Sampler({
       .filter = vk::Filter::eLinear,
@@ -61,7 +62,8 @@ void WorldRenderer::loadShaders()
 
   terrainPipeline2.loadShaders();
 
-  tonemapPipeline2.loadShaders();
+  // tonemapPipeline2.loadShaders();
+  aaPipeline2.loadShaders();
 
   skyboxPipeline2.loadShaders();
 
@@ -77,7 +79,8 @@ void WorldRenderer::setupPipelines(vk::Format /*swapchain_format*/)
   terrainPipeline2   .setup();
   skyboxPipeline2    .setup();
   resolveGPipeline2  .setup();
-  tonemapPipeline2   .setup();
+  // tonemapPipeline2   .setup();
+  aaPipeline2        .setup();
 }
 
 void WorldRenderer::debugInput(const Keyboard& kb) 
@@ -87,7 +90,8 @@ void WorldRenderer::debugInput(const Keyboard& kb)
   terrainPipeline2   .debugInput(kb);
   skyboxPipeline2    .debugInput(kb);
   resolveGPipeline2  .debugInput(kb);
-  tonemapPipeline2   .debugInput(kb);
+  // tonemapPipeline2   .debugInput(kb);
+  aaPipeline2        .debugInput(kb);
 
   if (kb[KeyboardKey::kPause] == ButtonState::Falling)
   {
@@ -203,7 +207,7 @@ void WorldRenderer::renderPostprocess(
   vk::CommandBuffer cmd_buf, vk::Image target_image, vk::ImageView target_image_view)
 {
   ETNA_PROFILE_GPU(cmd_buf, renderWorld);
-  if(!tonemapPipeline2.enabled())
+  if(!aaPipeline2.enabled())
   {
     etna::set_state(cmd_buf, 
       target_image, 
@@ -249,6 +253,7 @@ void WorldRenderer::renderPostprocess(
     return;
   }
 
+#if 0 //NOTE - Tonemap is disabled
   etna::set_state(cmd_buf, 
     backbuffer2.get(), 
     vk::PipelineStageFlagBits2::eComputeShader, 
@@ -259,7 +264,8 @@ void WorldRenderer::renderPostprocess(
   etna::flush_barriers(cmd_buf);
 
   tonemapPipeline2.tonemapEvaluate(cmd_buf, backbuffer2, renderContext);
-  
+#endif 
+
   etna::set_state(cmd_buf, 
     backbuffer2.get(), 
     vk::PipelineStageFlagBits2::eFragmentShader, 
@@ -276,7 +282,8 @@ void WorldRenderer::renderPostprocess(
     {}
   );
 
-  tonemapPipeline2.render(cmd_buf, backbuffer2, renderContext);
+  // tonemapPipeline2.render(cmd_buf, backbuffer2, renderContext);
+  aaPipeline2.render(cmd_buf, backbuffer2, renderContext);
 }
 
 
@@ -306,8 +313,13 @@ WorldRenderer::drawGui()
       ImGui::TreePop();
     }
     
-    if(ImGui::TreeNode("tonemap")) {
-      tonemapPipeline2.drawGui();
+    // if(ImGui::TreeNode("tonemap")) {
+    //   tonemapPipeline2.drawGui();
+    //   ImGui::TreePop();
+    // }
+
+    if(ImGui::TreeNode("aa")) {
+      aaPipeline2.drawGui();
       ImGui::TreePop();
     }
   }

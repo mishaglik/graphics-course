@@ -63,7 +63,7 @@ AAPipeline::debugInput(const Keyboard& /*kb*/)
 }
 
 void
-AAPipeline::render(vk::CommandBuffer cmd_buf, targets::Backbuffer& source, const RenderContext& ctx)
+AAPipeline::render(vk::CommandBuffer cmd_buf, targets::Backbuffer& source, const RenderContext& /*ctx*/)
 {
   ETNA_PROFILE_GPU(cmd_buf, pipelines_aa_render);
   {

@@ -1,4 +1,4 @@
-#include "Boilerplate.hpp"
+#include "AA.hpp"
 
 #include <etna/BlockingTransferHelper.hpp>
 #include <etna/Etna.hpp>
@@ -23,9 +23,9 @@ void
 AAPipeline::loadShaders() 
 {
     etna::create_program(
-        "boilerplate_shader",
-        { BOILERPLATE_PIPELINE_SHADERS_ROOT "boilerplate.vert.spv",
-          BOILERPLATE_PIPELINE_SHADERS_ROOT "boilerplate.frag.spv"}
+        "aa_shader",
+        { AA_PIPELINE_SHADERS_ROOT "aa.vert.spv",
+          AA_PIPELINE_SHADERS_ROOT "aa.frag.spv"}
     );
 }
 
@@ -35,7 +35,7 @@ AAPipeline::setup()
     auto& pipelineManager = etna::get_context().getPipelineManager();
 
     pipeline = pipelineManager.createGraphicsPipeline(
-    "boilerplate_shader",
+    "aa_shader",
     etna::GraphicsPipeline::CreateInfo{
       .fragmentShaderOutput =
         {
@@ -43,12 +43,17 @@ AAPipeline::setup()
           .depthAttachmentFormat  = RenderTarget::DEPTH_ATTACHMENT_FORMAT,
         },
     });
+    defaultSampler = etna::Sampler({
+      .filter = vk::Filter::eLinear,
+      .name = "aa sampler"
+    });
 }
 
 void 
 AAPipeline::drawGui()
 {
-
+  ImGui::Checkbox("Enabled", &m_enabled);
+  ImGui::LabelText("FXAA", "Algorithm:");
 }
 
 void 
@@ -58,27 +63,19 @@ AAPipeline::debugInput(const Keyboard& /*kb*/)
 }
 
 void
-AAPipeline::render(vk::CommandBuffer cmd_buf, RenderTarget& target, const RenderContext& ctx)
+AAPipeline::render(vk::CommandBuffer cmd_buf, targets::Backbuffer& source, const RenderContext& ctx)
 {
-  ETNA_PROFILE_GPU(cmd_buf, pipelines_boilerplate_render);
+  ETNA_PROFILE_GPU(cmd_buf, pipelines_aa_render);
   {
-    etna::RenderTargetState renderTargets(
-      cmd_buf,
-      {{0, 0}, {target.getResolution().x, target.getResolution().y}},
-      target.getColorAttachments(),
-      target.getDepthAttachment(),
-      {}
-    );
-
-    auto boilerplateShader = etna::get_shader_program("boilerplate_shader");
+    auto aaShader = etna::get_shader_program("aa_shader");
 
     cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.getVkPipeline());
 
     auto set = etna::create_descriptor_set(
-      boilerplateShader.getDescriptorLayoutId(0),
+      aaShader.getDescriptorLayoutId(0),
       cmd_buf,
       {
-        // etna::Binding{0, texture.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal, {.layerCount=6, .type=vk::ImageViewType::eCube})}
+        etna::Binding{0, source.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)}
       }
     );
     
@@ -90,13 +87,15 @@ AAPipeline::render(vk::CommandBuffer cmd_buf, RenderTarget& target, const Render
       {}
     );
 
-    cmd_buf.pushConstants(
-      pipeline.getVkPipelineLayout(), 
-      vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eVertex,
-      0,
-      uint32_t(sizeof(ctx.worldViewProj)),
-      &ctx.worldViewProj
-    );
+    if constexpr (sizeof(pushConstants) > 1) {
+      cmd_buf.pushConstants(
+        pipeline.getVkPipelineLayout(), 
+        vk::ShaderStageFlagBits::eFragment,
+        0,
+        uint32_t(sizeof(pushConstants)),
+        &pushConstants
+      );
+    }
 
     cmd_buf.draw(3, 1, 0, 0);
   }

@@ -17,6 +17,7 @@ layout(push_constant) uniform params_t
   float maxHeight;
   uint nChunks;
   uint subChunk;
+  uint corner;
 } params;
 
 void main()

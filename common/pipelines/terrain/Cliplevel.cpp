@@ -78,8 +78,8 @@ Cliplevel::update(vk::CommandBuffer cmd_buf, pipes::PerlinPipeline& pipeline, gl
                 if(chunk == (m_pos + glm::ivec2{i, j}) && !force) 
                     continue;
                 chunk = (m_pos + glm::ivec2{i, j});
-                glm::vec2 pos = static_cast<glm::vec2>(m_pos + glm::ivec2{i, j}) * m_step;
-                pipeline.reset(pos, m_chunk.getExtentPos() / 4.f, frequency);
+                glm::vec2 chunkPos = static_cast<glm::vec2>(m_pos + glm::ivec2{i, j}) * m_step;
+                pipeline.reset(chunkPos, m_chunk.getExtentPos() / 4.f, frequency);
                 glm::vec2 texStart  = glm::vec2(ix / 4.f, iy / 4.f);
                 glm::vec2 texExtent{.25f, .25f};
                

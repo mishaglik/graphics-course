@@ -55,20 +55,20 @@ private:
         float maxHeight = 64.f;
         glm::uint nHalfChunks  = 0;
         glm::uint subChunk = 0;
-
+        glm::uint corner = 0;
     } pushConstants;
 
     etna::GraphicsPipeline pipeline;
     etna::GraphicsPipeline pipelineDebug;
     
     PerlinPipeline terrainGenerator;
-    static const std::size_t N_CLIP_LEVELS = 2;
+    static const std::size_t N_CLIP_LEVELS = 5;
     std::array<pipes::terrain::Cliplevel, N_CLIP_LEVELS> levels;
 
     targets::TerrainChunk tmp;
 
     int terrainScale = 7;
-    int activeLayers = 1;
+    int activeLayers = 3;
     bool wireframe = false;
 
     float startFrequency = 0.003f;

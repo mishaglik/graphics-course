@@ -133,7 +133,7 @@ TerrainPipeline::setup()
     });
 
     tilingSampler = etna::Sampler({
-      .filter = vk::Filter::eLinear,
+      .filter = vk::Filter::eNearest,
       .addressMode = vk::SamplerAddressMode::eRepeat,
       .name = "tilingSampler",
     });
@@ -323,7 +323,12 @@ TerrainPipeline::drawSubChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& 
   pushConstants.extent = glob_chunk.getExtentPos() / float(nChunks) / 4.f;
   pushConstants.degree = 256;
   pushConstants.nHalfChunks = static_cast<glm::uint>(nHalfChunks);
-  pushConstants.base = glob_chunk.getStartPos() + glm::vec2(index) * glob_chunk.getExtentPos()  / 4.f;
+  pushConstants.base = glob_chunk.getStartPos() + glm::vec2(index) * glob_chunk.getExtentPos() / 4.f;
+  pushConstants.corner = 0x0;
+  if(index.x == 0) pushConstants.corner |= 0x01;
+  if(index.x == 3) pushConstants.corner |= 0x02;
+  if(index.y == 0) pushConstants.corner |= 0x04;
+  if(index.y == 3) pushConstants.corner |= 0x08;
 
   for(size_t i = 0; i < 2; ++i) {
     for(size_t j = 0; j < 2; ++j) {

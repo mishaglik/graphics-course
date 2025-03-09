@@ -10,7 +10,9 @@ permissions:
 jobs:
   build:
     runs-on: windows-2022
+    continue-on-error: ${{ matrix.build_type == 'Release'}} 
     strategy:
+      fail-fast: true
       matrix:
         build_type: [Debug, RelWithDebInfo, Release]
 

@@ -8,6 +8,7 @@ add_subdirectory(resolve_gbuffer)
 add_subdirectory(perlin)
 add_subdirectory(terrain)
 add_subdirectory(tonemap)
+add_subdirectory(aa)
 
 add_library(pipelines INTERFACE)
 
@@ -17,6 +18,7 @@ target_link_libraries(pipelines INTERFACE
     staticmesh_pipeline
     resolvegbuffer_pipeline
     tonemap_pipeline
+    aa_pipeline
 )
 
 add_custom_target(pipeline_shaders DEPENDS 
@@ -26,4 +28,5 @@ add_custom_target(pipeline_shaders DEPENDS
     resolvegbuffer_pipeline_shaders
     tonemap_pipeline_shaders
     perlin_pipeline_shaders
+    aa_pipeline_shaders
 )

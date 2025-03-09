@@ -13,6 +13,7 @@ layout(push_constant) uniform params_t
   float maxHeight;
   uint nChunks;
   uint subChunk;
+  uint corner;
 } params;
 
 layout(binding = 0) uniform sampler2D heightMap;
@@ -48,21 +49,18 @@ void main()
     vec4 p10 = gl_in[2].gl_Position;
     vec4 p11 = gl_in[3].gl_Position;
     
-    float tstep = (t01.y - t00.y) / params.degree; 
-    float pstep = (p01.z - p00.z) / params.degree; 
+    float tstep = 1. / 1024; 
+    float pstep = (p01.z - p00.z) / 4096; 
     
     vec4 p  = (p01 - p00) * u + (p10 - p00) * v + p00;
 
     float h   = texture(heightMap, t).r * params.maxHeight;
     h = max(h, params.seaLevel);
-    // h=14;
 
     float hn0 = texture(heightMap, t + vec2(tstep,    0)).r * params.maxHeight;
     float hn1 = texture(heightMap, t + vec2(   0, tstep)).r * params.maxHeight;
     hn0 = max(hn0, params.seaLevel);
     hn1 = max(hn1, params.seaLevel);
-    // hn0=14;
-    // hn1=14;
 
     vec4 pn0 = p + vec4(pstep, 0, 0, 0);
     vec4 pn1 = p + vec4(0, 0, pstep, 0);

@@ -10,11 +10,17 @@ if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC") # cl and clang-cl
     # Enforce standards-compliance in MSVC
     /permissive- /volatile:iso /Zc:inline /Zc:wchar_t /EHsc /Zc:__cplusplus
   )
+  if (CMAKE_BUILD_TYPE EQUAL Release)
+    add_compile_options(/WX)
+  endif()
   if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC") # cl only
     add_compile_options(/Zc:preprocessor)
   endif()
 elseif(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "GNU") # gcc and clang
-  add_compile_options(-Wall -Wextra -Werror -pedantic)
+  add_compile_options(-Wall -Wextra -pedantic)
+  if (CMAKE_BUILD_TYPE EQUAL Release)
+    add_compile_options(-Werror)
+  endif()
 endif()
 
 add_compile_definitions(

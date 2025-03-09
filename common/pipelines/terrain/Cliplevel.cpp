@@ -35,6 +35,40 @@ Cliplevel::update(vk::CommandBuffer cmd_buf, pipes::PerlinPipeline& pipeline, gl
             {},
             BarrierBehavoir::eSuppressBarriers
         };
+        if(force) {
+            std::array<vk::ClearAttachment, targets::TerrainChunk::N_COLOR_ATTACHMENTS> clearAtts{
+                vk::ClearAttachment{
+                    .aspectMask = vk::ImageAspectFlagBits::eColor,
+                    .colorAttachment = 0,
+                },
+                vk::ClearAttachment{
+                    .aspectMask = vk::ImageAspectFlagBits::eColor,
+                    .colorAttachment = 1,
+                },
+                vk::ClearAttachment{
+                    .aspectMask = vk::ImageAspectFlagBits::eColor,
+                    .colorAttachment = 2,
+                }
+            };
+            std::array<vk::ClearRect, targets::TerrainChunk::N_COLOR_ATTACHMENTS> clearRects{
+                vk::ClearRect{
+                    .rect = {{0, 0}, {m_chunk.getResolution().x, m_chunk.getResolution().y}},
+                    .baseArrayLayer = 0,
+                    .layerCount = 1
+                },
+                vk::ClearRect{
+                    .rect = {{0, 0}, {m_chunk.getResolution().x, m_chunk.getResolution().y}},
+                    .baseArrayLayer = 0,
+                    .layerCount = 1
+                },
+                vk::ClearRect{
+                    .rect = {{0, 0}, {m_chunk.getResolution().x, m_chunk.getResolution().y}},
+                    .baseArrayLayer = 0,
+                    .layerCount = 1
+                }
+            };
+            cmd_buf.clearAttachments(clearAtts, clearRects);
+        }
         for(int i = -2; i < 2; i++) {
             for(int j = -2; j < 2; j++) {
                 //NOTE - Some arithmetics to implement reuse of detailed
@@ -43,10 +77,14 @@ Cliplevel::update(vk::CommandBuffer cmd_buf, pipes::PerlinPipeline& pipeline, gl
                 auto& chunk = m_ipos[4 * ix + iy];
                 if(chunk == (m_pos + glm::ivec2{i, j}) && !force) 
                     continue;
+                chunk = (m_pos + glm::ivec2{i, j});
                 glm::vec2 pos = static_cast<glm::vec2>(m_pos + glm::ivec2{i, j}) * m_step;
                 pipeline.reset(pos, m_chunk.getExtentPos() / 4.f, frequency);
-                pipeline.setSubchunk({ix, iy});
-                pipeline.render(cmd_buf, m_chunk, octaves);
+                glm::vec2 texStart  = glm::vec2(ix / 4.f, iy / 4.f);
+                glm::vec2 texExtent{.25f, .25f};
+               
+                pipeline.setSubregion(texStart, texExtent);
+                pipeline.render(cmd_buf, m_chunk, static_cast<uint32_t>(octaves));
 
             }
         }

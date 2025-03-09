@@ -26,6 +26,7 @@ layout(push_constant) uniform params_t
   float maxHeight;
   uint nChunks;
   uint subChunk;
+  uint corner;
 } params;
 
 layout(set=0, binding = 0) uniform sampler2D hmap;
@@ -93,7 +94,8 @@ void main(void)
   
   // out_fragColor.rgb = heightColor(surf.height);
   out_fragColor.rgb = heightColor(texture(tprrMap, surf.texCoord).r);
-  out_fragColor.rgb = vec3(mod(surf.texCoord, 1), 0);
+  // out_fragColor.rgb = surf.normal.rgb;
+  // out_fragColor.g = 0;
   out_fragNormal = vec4(surf.normal.rgb, 0);
   out_fragWc = gl_FragCoord.w;
   out_fragMaterial  = heightMaterial(surf.height);

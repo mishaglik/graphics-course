@@ -145,7 +145,7 @@ void generate_chunk(vk::CommandBuffer cmd_buf, PerlinPipeline& pipeline, targets
             {},
             BarrierBehavoir::eSuppressBarriers
         };
-        pipeline.render(cmd_buf, dst, octaves);
+        pipeline.render(cmd_buf, dst, static_cast<uint32_t>(octaves));
     }
     #else
     auto& target = dst;
@@ -184,7 +184,7 @@ void update_chunk(vk::CommandBuffer cmd_buf, PerlinPipeline& pipeline, targets::
             {},
             BarrierBehavoir::eSuppressBarriers
         };
-        pipeline.render(cmd_buf, dst, octaves);
+        pipeline.render(cmd_buf, dst, static_cast<uint32_t>(octaves));
     }
     #else
     auto& target = dst;

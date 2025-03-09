@@ -74,6 +74,7 @@ public:
   pipes::ResolveGBufferPipeline resolveGPipeline2{};
 
   pipes::TonemapPipeline tonemapPipeline2{};
+  pipes::AAPipeline     aaPipeline2{};
   
   pipes::RenderContext renderContext{};
 
@@ -92,6 +93,6 @@ public:
 
   bool pause = false;
 
-  bool enableStaticMesh = false;
+  bool enableStaticMesh = true;
   
 };

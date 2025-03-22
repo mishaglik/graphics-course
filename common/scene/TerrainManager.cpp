@@ -12,6 +12,7 @@ TerrainManager::loadTextures()
     m_textures[2] = m_resources.loadFromFile(GRAPHICS_COURSE_RESOURCES_ROOT "/textures/terrain/" "snow.jpg"  );
     m_textures[3] = m_resources.loadFromFile(GRAPHICS_COURSE_RESOURCES_ROOT "/textures/terrain/" "rock.jpg"  );
     m_textures[4] = m_resources.loadFromFile(GRAPHICS_COURSE_RESOURCES_ROOT "/textures/terrain/" "ground.jpg");
+    m_textures[5] = Texture::Id::Undefined;
 
     m_sampler = etna::Sampler({
         .filter = vk::Filter::eNearest,
@@ -34,7 +35,6 @@ TerrainManager::drawGui()
     if(ImGui::Button("Regenerate")) {
         terrainValid = false;
     }
-    ImGui::TreePop();
     
     ImGui::SliderFloat("Max height", &m_maxHeight, 1, 100);
     ImGui::SliderFloat("Sea level", &m_seaLevel, 0, m_maxHeight);
@@ -61,7 +61,8 @@ TerrainManager::textureSet(vk::CommandBuffer cmd_buf, etna::DescriptorLayoutId d
             etna::Binding{1, m_resources[m_textures[1]].image.genBinding(m_sampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
             etna::Binding{2, m_resources[m_textures[2]].image.genBinding(m_sampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
             etna::Binding{3, m_resources[m_textures[3]].image.genBinding(m_sampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
-            etna::Binding{4, m_resources[m_textures[4]].image.genBinding(m_sampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)}
+            etna::Binding{4, m_resources[m_textures[4]].image.genBinding(m_sampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+            etna::Binding{5, m_resources[m_textures[5]].image.genBinding(m_sampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)}
         }
     );
 }

@@ -8,35 +8,32 @@
 #include <etna/Sampler.hpp>
 
 #include "pipelines/perlin/Perlin.hpp"
+#include "targets/Backbuffer.hpp"
 #include "targets/GBuffer.hpp"
 
 namespace pipes {
 
-class TerrainPipeline {
+class TerrainTransparentPipeline {
 public:
-    using RenderTarget = targets::GBuffer;
-    static_assert(RenderTarget::N_COLOR_ATTACHMENTS == 4, "Terrain renders into 4 layers");
+    using RenderTarget = targets::Backbuffer;
+    static_assert(RenderTarget::N_COLOR_ATTACHMENTS == 1, "Terrain transparent renders into 1 layer");
 
-    TerrainPipeline() {}
+    TerrainTransparentPipeline() {}
     
     void allocate();
     
     void loadShaders();
     
-    void loadTextures(SceneManager& scene_mgr);
-
     void setup();
     
     void drawGui();
     
     void debugInput(const Keyboard& /*kb*/);
 
-    void prepare(vk::CommandBuffer cmd_buf, const RenderContext& context) { regenerateTerrainIfNeeded(cmd_buf, {context.camPos.x, context.camPos.z}, context.sceneMgr->terrain()); }
-    RenderTarget& render (vk::CommandBuffer cmd_buf, RenderTarget& target, const RenderContext& context);
+    void render (vk::CommandBuffer cmd_buf, targets::GBuffer& source, const RenderContext& ctx, const etna::Image& skybox);
 
 private: 
     
-    void regenerateTerrainIfNeeded(vk::CommandBuffer cmd_buf, glm::vec2 pos, scene::TerrainManager& mgr);
     
     void drawChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& cur_chunk, uint8_t chunk_mask = 0xF);
     void drawSubChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& glob_chunk, glm::uvec2 index, uint8_t chunk_mask = 0xF);
@@ -59,7 +56,6 @@ private:
 
     etna::GraphicsPipeline pipeline;
     etna::GraphicsPipeline pipelineDebug;
-    pipes::PerlinPipeline terrainGenerator;
 
     bool wireframe = false;
 
@@ -68,4 +64,4 @@ private:
 };
 
 }
-static_assert(Pipeline<pipes::TerrainPipeline>, "Terrain must be valid pipeline");
+static_assert(Pipeline<pipes::TerrainTransparentPipeline>, "Terrain must be valid pipeline");

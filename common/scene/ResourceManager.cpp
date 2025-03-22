@@ -9,7 +9,7 @@
 
 namespace scene {
 
-void ResourceManger::init() {
+void ResourceManager::init() {
     Texture::Id undefinedTex = loadFromFile(GRAPHICS_COURSE_RESOURCES_ROOT "/textures/undefined.png");
     if(undefinedTex != Texture::Id::Undefined) {
         spdlog::log(spdlog::level::critical, "Undefined texture has bad Id");
@@ -65,14 +65,14 @@ void ResourceManger::init() {
 }
 
 Texture::Id 
-ResourceManger::primitiveTexture(uint8_t rgba)
+ResourceManager::primitiveTexture(uint8_t rgba)
 {
     rgba &= 0xF;
     return m_colorTextures[rgba];
 }
 
 Texture::Id 
-ResourceManger::loadFromFile(std::filesystem::path filepath)
+ResourceManager::loadFromFile(std::filesystem::path filepath)
 {
     auto& ctx = etna::get_context();
     int width, height, nChans;

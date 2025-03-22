@@ -1,4 +1,4 @@
-add_library(terrain_pipeline Terrain.cpp Cliplevel.cpp)
+add_library(terrain_pipeline Terrain.cpp)
 
 target_include_directories(terrain_pipeline PUBLIC ../..)
 

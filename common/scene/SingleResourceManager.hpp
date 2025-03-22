@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <vector>
+#include <cassert>
 template<typename T>
 requires requires{ T::Id::Invalid; }
 

@@ -161,10 +161,10 @@ StaticMeshPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer& target, 
     if (nInstances[j] != 0)
     {
       Material::Id mid = relems[j].materialId;
-      auto& material = ctx.sceneMgr->get(mid == Material::Id::Invalid ? ctx.sceneMgr->getStubMaterial() : relems[j].materialId);
+      auto& material = ctx.sceneMgr->get(mid);
       auto& baseColorImage = ctx.sceneMgr->get(material.baseColorTexture).image;
-      auto& normalImage = normalMap ? ctx.sceneMgr->get(material.normalTexture).image : ctx.sceneMgr->get(ctx.sceneMgr->getStubBlueTexture()).image;
-      auto& metallicRoughnessImage = normalMap ? ctx.sceneMgr->get(material.metallicRoughnessTexture).image : ctx.sceneMgr->get(ctx.sceneMgr->getStubTexture()).image;
+      auto& normalImage =  ctx.sceneMgr->get(normalMap ? material.normalTexture : ctx.sceneMgr->resources().primitiveTexture(0x4)).image;
+      auto& metallicRoughnessImage = ctx.sceneMgr->get(normalMap ?  material.metallicRoughnessTexture : ctx.sceneMgr->resources().primitiveTexture(0)).image;
       auto set1 = etna::create_descriptor_set(
         staticMesh.getDescriptorLayoutId(1),
         cmd_buf,

@@ -18,6 +18,7 @@ layout(push_constant) uniform params_t
   uint nChunks;
   uint subChunk;
   uint corner;
+  float time;
 } params;
 
 void main()

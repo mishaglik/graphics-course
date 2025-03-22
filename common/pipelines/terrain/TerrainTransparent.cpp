@@ -1,4 +1,4 @@
-#include "Terrain.hpp"
+#include "TerrainTransparent.hpp"
 
 #include <etna/BlockingTransferHelper.hpp>
 #include <etna/Etna.hpp>
@@ -14,32 +14,29 @@
 namespace pipes {
 
 void 
-TerrainPipeline::allocate()
+TerrainTransparentPipeline::allocate()
 {
-  terrainGenerator.allocate();
 }
 
 void 
-TerrainPipeline::loadShaders() 
+TerrainTransparentPipeline::loadShaders() 
 {
-    terrainGenerator.loadShaders();
     etna::create_program(
-        "terrain_shader",
+        "terrain_transparent",
         { TERRAIN_PIPELINE_SHADERS_ROOT "terrain.vert.spv",
           TERRAIN_PIPELINE_SHADERS_ROOT "terrain.tesc.spv",
-          TERRAIN_PIPELINE_SHADERS_ROOT "terrain.tese.spv",
-          TERRAIN_PIPELINE_SHADERS_ROOT "terrain.frag.spv"}
+          TERRAIN_PIPELINE_SHADERS_ROOT "terrain_transparent.tese.spv",
+          TERRAIN_PIPELINE_SHADERS_ROOT "terrain_transparent.frag.spv"}
     );
 }
 
 void 
-TerrainPipeline::setup() 
+TerrainTransparentPipeline::setup() 
 {
-    terrainGenerator.setup();
     auto& pipelineManager = etna::get_context().getPipelineManager();
 
     pipeline = pipelineManager.createGraphicsPipeline(
-    "terrain_shader",
+    "terrain_transparent",
     etna::GraphicsPipeline::CreateInfo{
       .inputAssemblyConfig = {.topology = vk::PrimitiveTopology::ePatchList},
       .tessellationConfig = {
@@ -49,25 +46,17 @@ TerrainPipeline::setup()
       .blendingConfig = {
         .attachments = {
           vk::PipelineColorBlendAttachmentState{
-            .blendEnable = vk::False,
+            .blendEnable = vk::True,
+            .srcColorBlendFactor = vk::BlendFactor::eSrcAlpha,
+            .dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha,
+            .colorBlendOp = vk::BlendOp::eAdd,
+            .srcAlphaBlendFactor = vk::BlendFactor::eZero,
+            .dstAlphaBlendFactor = vk::BlendFactor::eOne,
+            .alphaBlendOp = vk::BlendOp::eAdd,
             .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
               vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
           },
-          vk::PipelineColorBlendAttachmentState{
-            .blendEnable = vk::False,
-            .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
-              vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
-          },
-          vk::PipelineColorBlendAttachmentState{
-            .blendEnable = vk::False,
-            .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
-              vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
-          },
-          vk::PipelineColorBlendAttachmentState{
-            .blendEnable = vk::False,
-            .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
-              vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
-          },
+          
         },
         .logicOpEnable = false,
         .logicOp = {},
@@ -82,7 +71,7 @@ TerrainPipeline::setup()
     });
 
     pipelineDebug = pipelineManager.createGraphicsPipeline(
-    "terrain_shader",
+    "terrain_transparent",
     etna::GraphicsPipeline::CreateInfo{
       .inputAssemblyConfig = {.topology = vk::PrimitiveTopology::ePatchList},
       .tessellationConfig = { 
@@ -95,22 +84,13 @@ TerrainPipeline::setup()
       .blendingConfig = {
         .attachments = {
           vk::PipelineColorBlendAttachmentState{
-            .blendEnable = vk::False,
-            .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
-              vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
-          },
-          vk::PipelineColorBlendAttachmentState{
-            .blendEnable = vk::False,
-            .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
-              vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
-          },
-          vk::PipelineColorBlendAttachmentState{
-            .blendEnable = vk::False,
-            .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
-              vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
-          },
-          vk::PipelineColorBlendAttachmentState{
-            .blendEnable = vk::False,
+            .blendEnable = vk::True,
+            .srcColorBlendFactor = vk::BlendFactor::eSrcAlpha,
+            .dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha,
+            .colorBlendOp = vk::BlendOp::eAdd,
+            .srcAlphaBlendFactor = vk::BlendFactor::eZero,
+            .dstAlphaBlendFactor = vk::BlendFactor::eOne,
+            .alphaBlendOp = vk::BlendOp::eAdd,
             .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
               vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
           },
@@ -134,25 +114,19 @@ TerrainPipeline::setup()
 }
 
 void 
-TerrainPipeline::drawGui()
+TerrainTransparentPipeline::drawGui()
 {
-    terrainGenerator.drawGui();
-
-    ImGui::Checkbox("Wireframe [F3]", &wireframe);
+    ImGui::Checkbox("Wireframe sea", &wireframe);
 }
 
 void 
-TerrainPipeline::debugInput(const Keyboard& kb)
+TerrainTransparentPipeline::debugInput(const Keyboard& )
 {
-    terrainGenerator.debugInput(kb);
-    if (kb[KeyboardKey::kF3] == ButtonState::Falling) {
-        wireframe = !wireframe;
-        spdlog::info("terrain wireframe is {}", wireframe ? "on" : "off");
-    }
+
 }
 
-targets::GBuffer& 
-TerrainPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer& target, const RenderContext& ctx)
+void
+TerrainTransparentPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer&, const RenderContext& ctx, const etna::Image&)
 {
   ETNA_PROFILE_GPU(cmd_buf, renderTerrain);
   pushConstants.mat  = ctx.worldViewProj;
@@ -160,12 +134,12 @@ TerrainPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer& target, con
   pushConstants.seaLevel = ctx.sceneMgr->terrain().seaLevel();
   pushConstants.maxHeight = ctx.sceneMgr->terrain().maxHeight();
   pushConstants.time = ctx.frameTime;
-    
+  
   auto& currentPipeline = wireframe ? pipelineDebug : pipeline;
   
   cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, currentPipeline.getVkPipeline());
   
-  auto terrainShader = etna::get_shader_program("terrain_shader");
+  auto terrainShader = etna::get_shader_program("terrain_transparent");
   set1 = ctx.sceneMgr->terrain().textureSet(cmd_buf, terrainShader.getDescriptorLayoutId(1));
   
   auto levels = ctx.sceneMgr->terrain().levels();
@@ -197,105 +171,12 @@ TerrainPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer& target, con
     } 
   }
 
-  return target;
 }
 
 void 
-TerrainPipeline::regenerateTerrainIfNeeded(vk::CommandBuffer cmd_buf, glm::vec2 pos, scene::TerrainManager& terrain)
+TerrainTransparentPipeline::drawChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& cur_chunk, uint8_t chunk_mask)
 {
-  ETNA_PROFILE_GPU(cmd_buf, terrainGenerator);
-  auto levels = terrain.levels();
-  for(std::size_t i = 0; i < levels.size(); ++i) {
-    auto& level = levels[i];
-    glm::ivec2 newPos = static_cast<glm::ivec2>(glm::trunc(pos / level.step));
-    if(newPos == level.pos && terrain.isUpToDate()) 
-        continue;
-    level.pos = newPos;
-    level.chunk.iPos = level.pos + glm::ivec2{-2, -2};
-    level.chunk.setPosition(static_cast<glm::vec2>(level.pos + glm::ivec2{-2, -2}) * level.step);
-    level.chunk.setState(cmd_buf,
-        vk::PipelineStageFlagBits2::eColorAttachmentOutput, 
-        vk::AccessFlagBits2::eColorAttachmentRead | vk::AccessFlagBits2::eColorAttachmentWrite, 
-        vk::ImageLayout::eColorAttachmentOptimal, 
-        vk::ImageAspectFlagBits::eColor
-    );
-    etna::flush_barriers(cmd_buf);
-    {
-        etna::RenderTargetState renderTarget{
-            cmd_buf,
-            {{0, 0}, {level.chunk.getResolution().x, level.chunk.getResolution().y}},
-            level.chunk.getColorAttachments(),
-            {},
-            BarrierBehavoir::eSuppressBarriers
-        };
-        if(!terrain.isUpToDate()) {
-            std::array<vk::ClearAttachment, targets::TerrainChunk::N_COLOR_ATTACHMENTS> clearAtts{
-                vk::ClearAttachment{
-                    .aspectMask = vk::ImageAspectFlagBits::eColor,
-                    .colorAttachment = 0,
-                },
-                vk::ClearAttachment{
-                    .aspectMask = vk::ImageAspectFlagBits::eColor,
-                    .colorAttachment = 1,
-                },
-                vk::ClearAttachment{
-                    .aspectMask = vk::ImageAspectFlagBits::eColor,
-                    .colorAttachment = 2,
-                }
-            };
-            std::array<vk::ClearRect, targets::TerrainChunk::N_COLOR_ATTACHMENTS> clearRects{
-                vk::ClearRect{
-                    .rect = {{0, 0}, {level.chunk.getResolution().x, level.chunk.getResolution().y}},
-                    .baseArrayLayer = 0,
-                    .layerCount = 1
-                },
-                vk::ClearRect{
-                    .rect = {{0, 0}, {level.chunk.getResolution().x, level.chunk.getResolution().y}},
-                    .baseArrayLayer = 0,
-                    .layerCount = 1
-                },
-                vk::ClearRect{
-                    .rect = {{0, 0}, {level.chunk.getResolution().x, level.chunk.getResolution().y}},
-                    .baseArrayLayer = 0,
-                    .layerCount = 1
-                }
-            };
-            cmd_buf.clearAttachments(clearAtts, clearRects);
-        }
-        for(int i = -2; i < 2; i++) {
-            for(int j = -2; j < 2; j++) {
-                //NOTE - Some arithmetics to implement reuse of detailed
-                int ix = ((level.pos.x + i) % 4 + 4) % 4;
-                int iy = ((level.pos.y + j) % 4 + 4) % 4;
-                auto& chunk = level.ipos[4 * ix + iy];
-                if(chunk == (level.pos + glm::ivec2{i, j}) && terrain.isUpToDate()) 
-                    continue;
-                chunk = (level.pos + glm::ivec2{i, j});
-                glm::vec2 chunkPos = static_cast<glm::vec2>(level.pos + glm::ivec2{i, j}) * level.step;
-                terrainGenerator.reset(chunkPos, level.chunk.getExtentPos() / 4.f, terrain.frequency());
-                glm::vec2 texStart  = glm::vec2(ix / 4.f, iy / 4.f);
-                glm::vec2 texExtent{.25f, .25f};
-               
-                terrainGenerator.setSubregion(texStart, texExtent);
-                terrainGenerator.render(cmd_buf, level.chunk, static_cast<uint32_t>(terrain.terrainScale()-std::min((int)i, terrain.terrainScale()-1)));
-            }
-        }
-    }
-    level.chunk.setState(cmd_buf,
-        vk::PipelineStageFlagBits2::eTessellationEvaluationShader | vk::PipelineStageFlagBits2::eFragmentShader, 
-        vk::AccessFlagBits2::eShaderSampledRead, 
-        vk::ImageLayout::eShaderReadOnlyOptimal, 
-        vk::ImageAspectFlagBits::eColor
-    );
-  }
-
-  terrain.setValid(true);
-}
-
-void 
-TerrainPipeline::drawChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& cur_chunk, uint8_t chunk_mask)
-{
-  auto terrainShader = etna::get_shader_program("terrain_shader");
+  auto terrainShader = etna::get_shader_program("terrain_transparent");
 
   auto set = etna::create_descriptor_set(
     terrainShader.getDescriptorLayoutId(0),
@@ -347,9 +228,9 @@ TerrainPipeline::drawChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& cur
 }
 
 void 
-TerrainPipeline::drawSubChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& glob_chunk, glm::uvec2 index, uint8_t chunk_mask)
+TerrainTransparentPipeline::drawSubChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& glob_chunk, glm::uvec2 index, uint8_t chunk_mask)
 {
-  auto terrainShader = etna::get_shader_program("terrain_shader");
+  auto terrainShader = etna::get_shader_program("terrain_transparent");
 
   auto set = etna::create_descriptor_set(
     terrainShader.getDescriptorLayoutId(0),
@@ -402,11 +283,5 @@ TerrainPipeline::drawSubChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& 
     }
   }
 }
-
-void TerrainPipeline::loadTextures(SceneManager&)
-{
-
-}
-
 
 } /* namespace pipes */

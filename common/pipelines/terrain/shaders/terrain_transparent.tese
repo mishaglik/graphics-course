@@ -31,6 +31,10 @@ layout (location = 0) out TSE_OUT
   float height;
 } surf;
 
+float seaLevel(vec2 coord) {
+  return params.seaLevel + 0.1 * sin(1.5 * (coord.x  + coord.y) + params.time) + 0.1 * sin(0.01 * (params.time * coord.x  + 70 * coord.y) + params.time);
+}
+
 void main()
 {
     float u = gl_TessCoord.x;
@@ -55,13 +59,10 @@ void main()
     
     vec4 p  = (p01 - p00) * u + (p10 - p00) * v + p00;
 
-    float h   = texture(heightMap, t).r * params.maxHeight;
-    // h = max(h, params.seaLevel);
-
-    float hn0 = texture(heightMap, t + vec2(tstep,    0)).r * params.maxHeight;
-    float hn1 = texture(heightMap, t + vec2(   0, tstep)).r * params.maxHeight;
-    // hn0 = max(hn0, params.seaLevel);
-    // hn1 = max(hn1, params.seaLevel);
+  
+    float h   = seaLevel(p.xz);
+    float hn0 = seaLevel(p.xz + vec2(pstep,    0));
+    float hn1 = seaLevel(p.xz + vec2(   0, pstep));
 
     vec4 pn0 = p + vec4(pstep, 0, 0, 0);
     vec4 pn1 = p + vec4(0, 0, pstep, 0);

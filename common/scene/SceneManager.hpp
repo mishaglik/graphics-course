@@ -11,6 +11,7 @@
 #include "LightSource.hpp"
 #include "Material.hpp"
 #include "scene/SingleResourceManager.hpp"
+#include "scene/ResourceManager.hpp"
 
 // A single render element (relem) corresponds to a single draw call
 // of a certain pipeline with specific bindings (including material data)
@@ -60,21 +61,21 @@ public:
 
   const auto& getLights() const { return lightSources; }
 
-  const auto& operator[](Material   ::Id id) const { return    materials[id]; }
-  const auto& operator[](LightSource::Id id) const { return lightSources[id]; }
-  const auto& operator[](Texture    ::Id id) const { return     textures[id]; }
+  const auto& operator[](Material   ::Id id) const { return m_resources[id]; }
+  const auto& operator[](Texture    ::Id id) const { return m_resources[id]; }
 
-  const auto& get(Material   ::Id id) const { return    materials[id]; }
+  const auto& operator[](LightSource::Id id) const { return lightSources[id]; }
+
+  const auto& get(Material   ::Id id) const { return m_resources[id]; }
+  const auto& get(Texture    ::Id id) const { return m_resources[id]; }
   const auto& get(LightSource::Id id) const { return lightSources[id]; }
-  const auto& get(Texture    ::Id id) const { return     textures[id]; }
   
   Material::Id getStubMaterial();
   Texture::Id getStubTexture();
-  Texture::Id getStubRedTexture();
-  Texture::Id getStubBlueTexture();
 
-  Texture::Id loadTexture(std::filesystem::path);
+  Texture::Id loadTexture(std::filesystem::path path) { return m_resources.loadFromFile(path); }
 
+  scene::ResourceManger& resources() { return m_resources; }
 private:
 
   std::optional<tinygltf::Model> loadModel(std::filesystem::path path);
@@ -87,10 +88,10 @@ private:
   };
 
   ProcessedInstances processInstances(const tinygltf::Model& model) const;
-  void loadModelResources(std::filesystem::path, const tinygltf::Model& model);
+  std::vector<Texture::Id> loadModelResources(std::filesystem::path, const tinygltf::Model& model);
   
   //! Must be after loading resources
-  void processMaterials(const tinygltf::Model& model);
+  std::vector<Material::Id> processMaterials(const tinygltf::Model& model, const std::vector<Texture::Id>& texture_mapping);
 
   
 
@@ -114,8 +115,8 @@ private:
     std::vector<Mesh> meshes;
     std::vector<glm::mat2x3> bounds;
   };
-  ProcessedMeshes processMeshes(const tinygltf::Model& model) const;
-  ProcessedMeshes processMeshesBaked(const tinygltf::Model& model) const;
+  ProcessedMeshes processMeshes(const tinygltf::Model& model, const std::vector<Material::Id> material_mapping) const;
+  ProcessedMeshes processMeshesBaked(const tinygltf::Model& model, const std::vector<Material::Id> material_mapping) const;
   void uploadData(std::span<const Vertex> vertices, std::span<const std::uint32_t>);
 
   void setupLights();
@@ -137,10 +138,6 @@ private:
 
   SingleResourceManager<LightSource> lightSources;
 
-  SingleResourceManager<Material> materials;
-  SingleResourceManager<Texture > textures;
-  Texture::Id stubTexture = Texture::Id::Invalid;
-  Texture::Id stubRedTexture = Texture::Id::Invalid;
-  Texture::Id stubBlueTexture = Texture::Id::Invalid;
-  Material::Id stubMaterial = Material::Id::Invalid;
+  scene::ResourceManger m_resources;
+
 };

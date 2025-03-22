@@ -1,4 +1,4 @@
-add_library(terrain_pipeline Terrain.cpp)
+add_library(terrain_pipeline Terrain.cpp TerrainTransparent.cpp)
 
 target_include_directories(terrain_pipeline PUBLIC ../..)
 
@@ -15,4 +15,6 @@ target_add_shaders(terrain_pipeline
   shaders/terrain.frag
   shaders/terrain.tese
   shaders/terrain.tesc
+  shaders/terrain_transparent.frag
+  shaders/terrain_transparent.tese
 )

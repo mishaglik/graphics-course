@@ -8,6 +8,7 @@
 #include <glm/glm.hpp>
 
 #include "pipelines/Pipelines.hpp"
+#include "pipelines/terrain/TerrainTransparent.hpp"
 #include "targets/Backbuffer.hpp"
 #include "targets/GBuffer.hpp"
 #include "scene/SceneManager.hpp"
@@ -64,10 +65,9 @@ public:
   etna::RenderTargetState::AttachmentParams gBufferDepthAttachment;
 
   etna::Buffer constants;
-
-
   
   pipes::TerrainPipeline    terrainPipeline2{};
+  pipes::TerrainTransparentPipeline terrainTransparentPipeline2{};
   pipes::StaticMeshPipeline staticMeshPipeline2{};
   
   pipes::SkyboxPipeline         skyboxPipeline2{};

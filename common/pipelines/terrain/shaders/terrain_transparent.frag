@@ -3,9 +3,7 @@
 #extension GL_GOOGLE_include_directive : require
 
 layout(location = 0) out vec4 out_fragColor;
-layout(location = 1) out vec4 out_fragNormal;
-layout(location = 2) out vec4 out_fragMaterial;
-layout(location = 3) out float out_fragWc;
+
 
 layout (location = 0) in VS_OUT
 {
@@ -56,38 +54,6 @@ vec3 hue(float x) {
   
 }
 
-vec3 heightColor(float height)
-{
-  height = clamp(texture(hmap, surf.texCoord).r, 0, 1);
-  vec4 tpxx   = texture(tprrMap, surf.texCoord);
-  
-  if(height > 0.8)
-  {
-    return texture(snowTexture, 0.05 * surf.worldCoord).rgb;
-  }
-  
-  // vec3 color = vec3(pow(tpxx.r, 2), 0.9, pow(1-tpxx.r, 2));
-  vec3 color = vec3(0);
-  if(height * params.maxHeight < params.seaLevel) {
-    color = texture(gravelTexture, 10 * surf.texCoord).rgb;
-  } else {
-    color = texture(grasTexture, 10 * surf.texCoord).rgb;
-  }
-  float rockiness = clamp(((height - 0.6) / 0.1), 0, 1);
-  color = mix(color, texture(rockTexture, 0.05*surf.worldCoord).rgb, rockiness);
-  color = mix(color, texture(roadTexture, surf.worldCoord).rgb, sin(3.1415 / 2 * tpxx.g));
-  float sandiness = 1-clamp((abs(params.seaLevel / params.maxHeight - height) - 0.01) / 0.01, 0, 1);
-  sandiness = pow(sandiness, 2);
-  color = mix(color, texture(sandTexture, surf.worldCoord).rgb, sandiness);
-  return color;
-}
-
-vec4 heightMaterial(float height)
-{
-  if(height > 25)
-    return vec4(0, 0.5, 0.0, 1);
-  return vec4(0, 0.8, 0.0, 1);
-}
 
 void main(void)
 {
@@ -95,10 +61,14 @@ void main(void)
   //out_fragColor = vec4(gl_FragCoord.z, depthToDist(gl_FragCoord.z) / far, 1., 0);
   
   // out_fragColor.rgb = heightColor(surf.height);
-  out_fragColor.rgb = heightColor(texture(tprrMap, surf.texCoord).r);
+  // out_fragColor.rgb = heightColor(texture(tprrMap, surf.texCoord).r);
+  vec4 tpxx   = texture(tprrMap, surf.texCoord);
+  vec3 color = vec3(0.01, 0.01, 0.71) + vec3(0, tpxx.r / 4, -tpxx.r / 4);
+  color = color * max(0.1, dot(normalize(surf.normal.rgb), vec3(0, 1, 0)));
+  out_fragColor = vec4(color, 0.9);
   // out_fragColor.rgb = surf.normal.rgb;
   // out_fragColor.g = 0;
-  out_fragNormal = vec4(surf.normal.rgb, 0);
-  out_fragWc = gl_FragCoord.w;
-  out_fragMaterial  = heightMaterial(surf.height);
+  // out_fragNormal = vec4(surf.normal.rgb, 0);
+  // out_fragWc = gl_FragCoord.w;
+  // out_fragMaterial  = heightMaterial(surf.height);
 }

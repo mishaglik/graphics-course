@@ -16,13 +16,7 @@ namespace pipes {
 void 
 TerrainPipeline::allocate()
 {
-    terrainGenerator.allocate();
-    for(std::size_t i = 0; i < N_CLIP_LEVELS; ++i) {
-      auto& level = levels[i];
-      level.allocate({32<<i, 32<<i}, heightMapResolution);
-    }
-    tmp  .allocate({heightMapResolution, heightMapResolution});
-    // auto& ctx = etna::get_context();
+  terrainGenerator.allocate();
 }
 
 void 
@@ -142,25 +136,8 @@ TerrainPipeline::setup()
 void 
 TerrainPipeline::drawGui()
 {
-    if(ImGui::TreeNode("Generator settings")) {
-        if(ImGui::SliderInt("Terrain scale", &terrainScale, 1, 32)) {
-          terrainValid = true;
-        }
-        
-        if(ImGui::SliderFloat("Frequency", &startFrequency, 0, 1)) {
-          terrainValid = false;
-        }
-        
-        terrainGenerator.drawGui();
-        if(ImGui::Button("Regenerate")) {
-          terrainValid = false;
-        }
-        ImGui::TreePop();
-    }
+    terrainGenerator.drawGui();
 
-    ImGui::SliderFloat("Max height", &pushConstants.maxHeight, 1, 100);
-    ImGui::SliderFloat("Sea level", &pushConstants.seaLevel, 0, pushConstants.maxHeight);
-    ImGui::SliderInt("Active layers", &activeLayers, 1, N_CLIP_LEVELS);
     ImGui::Checkbox("Wireframe [F3]", &wireframe);
 }
 
@@ -180,33 +157,27 @@ TerrainPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer& target, con
   ETNA_PROFILE_GPU(cmd_buf, renderTerrain);
   pushConstants.mat  = ctx.worldViewProj;
   pushConstants.camPos  = ctx.camPos;
+  pushConstants.seaLevel = ctx.sceneMgr->terrain().seaLevel();
+  pushConstants.maxHeight = ctx.sceneMgr->terrain().maxHeight();
     
   auto& currentPipeline = wireframe ? pipelineDebug : pipeline;
   
   cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, currentPipeline.getVkPipeline());
   
   auto terrainShader = etna::get_shader_program("terrain_shader");
-  set1 = etna::create_descriptor_set(
-    terrainShader.getDescriptorLayoutId(1),
-    cmd_buf,
-    {
-      etna::Binding{0, (*ctx.sceneMgr)[m_textures[0]].image.genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
-      etna::Binding{1, (*ctx.sceneMgr)[m_textures[1]].image.genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
-      etna::Binding{2, (*ctx.sceneMgr)[m_textures[2]].image.genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
-      etna::Binding{3, (*ctx.sceneMgr)[m_textures[3]].image.genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
-      etna::Binding{4, (*ctx.sceneMgr)[m_textures[4]].image.genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)}
-    }
-  );
-  for(int i = 0; i < activeLayers; ++i) {
+  set1 = ctx.sceneMgr->terrain().textureSet(cmd_buf, terrainShader.getDescriptorLayoutId(1));
+  
+  auto levels = ctx.sceneMgr->terrain().levels();
+  for(size_t i = 0; i < levels.size(); ++i) {
     auto& level = levels[i];
     for(unsigned x = 0; x < 4; ++x) {
       for(unsigned y = 0; y < 4; ++y) {
-        int dx = ((x - level.getIPos().x) % 4 + 6) % 4;
-        int dy = ((y - level.getIPos().y) % 4 + 6) % 4;
+        int dx = ((x - level.pos.x) % 4 + 6) % 4;
+        int dy = ((y - level.pos.y) % 4 + 6) % 4;
         uint8_t mask = 0;
         if (i != 0) {
-          glm::ivec2 idx = (level.getChunk().iPos + glm::ivec2{dx, dy}) * 2;
-          glm::ivec2 bIdx = levels[i-1].getIPos();
+          glm::ivec2 idx = (level.chunk.iPos + glm::ivec2{dx, dy}) * 2;
+          glm::ivec2 bIdx = levels[i-1].pos;
           if(idx.x - bIdx.x >  0) mask |= 0b1100;
           if(idx.x - bIdx.x >  1) mask |= 0b1111;
           if(idx.x - bIdx.x < -2) mask |= 0b0011;
@@ -220,7 +191,7 @@ TerrainPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer& target, con
           mask = 0xF;
         }
         // drawChunk(cmd_buf, chunk, mask);
-        drawSubChunk(cmd_buf, level.getChunk(), {dx, dy}, mask);
+        drawSubChunk(cmd_buf, level.chunk, {dx, dy}, mask);
       }
     } 
   }
@@ -229,15 +200,95 @@ TerrainPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer& target, con
 }
 
 void 
-TerrainPipeline::regenerateTerrainIfNeeded(vk::CommandBuffer cmd_buf, glm::vec2 pos)
+TerrainPipeline::regenerateTerrainIfNeeded(vk::CommandBuffer cmd_buf, glm::vec2 pos, scene::TerrainManager& terrain)
 {
   ETNA_PROFILE_GPU(cmd_buf, terrainGenerator);
-  for(std::size_t i = 0; i < N_CLIP_LEVELS; ++i) {
+  auto levels = terrain.levels();
+  for(std::size_t i = 0; i < levels.size(); ++i) {
     auto& level = levels[i];
-    level.update(cmd_buf, terrainGenerator, pos, tmp, startFrequency, terrainScale-std::min((int)i, terrainScale-1), !terrainValid);
+    glm::ivec2 newPos = static_cast<glm::ivec2>(glm::trunc(pos / level.step));
+    if(newPos == level.pos && terrain.isUpToDate()) 
+        continue;
+    level.pos = newPos;
+    level.chunk.iPos = level.pos + glm::ivec2{-2, -2};
+    level.chunk.setPosition(static_cast<glm::vec2>(level.pos + glm::ivec2{-2, -2}) * level.step);
+    level.chunk.setState(cmd_buf,
+        vk::PipelineStageFlagBits2::eColorAttachmentOutput, 
+        vk::AccessFlagBits2::eColorAttachmentRead | vk::AccessFlagBits2::eColorAttachmentWrite, 
+        vk::ImageLayout::eColorAttachmentOptimal, 
+        vk::ImageAspectFlagBits::eColor
+    );
+    etna::flush_barriers(cmd_buf);
+    {
+        etna::RenderTargetState renderTarget{
+            cmd_buf,
+            {{0, 0}, {level.chunk.getResolution().x, level.chunk.getResolution().y}},
+            level.chunk.getColorAttachments(),
+            {},
+            BarrierBehavoir::eSuppressBarriers
+        };
+        if(!terrain.isUpToDate()) {
+            std::array<vk::ClearAttachment, targets::TerrainChunk::N_COLOR_ATTACHMENTS> clearAtts{
+                vk::ClearAttachment{
+                    .aspectMask = vk::ImageAspectFlagBits::eColor,
+                    .colorAttachment = 0,
+                },
+                vk::ClearAttachment{
+                    .aspectMask = vk::ImageAspectFlagBits::eColor,
+                    .colorAttachment = 1,
+                },
+                vk::ClearAttachment{
+                    .aspectMask = vk::ImageAspectFlagBits::eColor,
+                    .colorAttachment = 2,
+                }
+            };
+            std::array<vk::ClearRect, targets::TerrainChunk::N_COLOR_ATTACHMENTS> clearRects{
+                vk::ClearRect{
+                    .rect = {{0, 0}, {level.chunk.getResolution().x, level.chunk.getResolution().y}},
+                    .baseArrayLayer = 0,
+                    .layerCount = 1
+                },
+                vk::ClearRect{
+                    .rect = {{0, 0}, {level.chunk.getResolution().x, level.chunk.getResolution().y}},
+                    .baseArrayLayer = 0,
+                    .layerCount = 1
+                },
+                vk::ClearRect{
+                    .rect = {{0, 0}, {level.chunk.getResolution().x, level.chunk.getResolution().y}},
+                    .baseArrayLayer = 0,
+                    .layerCount = 1
+                }
+            };
+            cmd_buf.clearAttachments(clearAtts, clearRects);
+        }
+        for(int i = -2; i < 2; i++) {
+            for(int j = -2; j < 2; j++) {
+                //NOTE - Some arithmetics to implement reuse of detailed
+                int ix = ((level.pos.x + i) % 4 + 4) % 4;
+                int iy = ((level.pos.y + j) % 4 + 4) % 4;
+                auto& chunk = level.ipos[4 * ix + iy];
+                if(chunk == (level.pos + glm::ivec2{i, j}) && terrain.isUpToDate()) 
+                    continue;
+                chunk = (level.pos + glm::ivec2{i, j});
+                glm::vec2 chunkPos = static_cast<glm::vec2>(level.pos + glm::ivec2{i, j}) * level.step;
+                terrainGenerator.reset(chunkPos, level.chunk.getExtentPos() / 4.f, terrain.frequency());
+                glm::vec2 texStart  = glm::vec2(ix / 4.f, iy / 4.f);
+                glm::vec2 texExtent{.25f, .25f};
+               
+                terrainGenerator.setSubregion(texStart, texExtent);
+                terrainGenerator.render(cmd_buf, level.chunk, static_cast<uint32_t>(terrain.terrainScale()-std::min((int)i, terrain.terrainScale()-1)));
+            }
+        }
+    }
+    level.chunk.setState(cmd_buf,
+        vk::PipelineStageFlagBits2::eTessellationEvaluationShader | vk::PipelineStageFlagBits2::eFragmentShader, 
+        vk::AccessFlagBits2::eShaderSampledRead, 
+        vk::ImageLayout::eShaderReadOnlyOptimal, 
+        vk::ImageAspectFlagBits::eColor
+    );
   }
 
-  terrainValid = true;
+  terrain.setValid(true);
 }
 
 void 
@@ -265,7 +316,7 @@ TerrainPipeline::drawChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& cur
     {}
   );
 
-  const size_t nChunks = std::max(static_cast<uint64_t>(2ul), heightMapResolution / MAX_TESCELLATION);
+  const size_t nChunks = std::max(static_cast<uint64_t>(2ul), static_cast<uint64_t>(2ul)); //FIXME: heightMapResolution / MAX_TESCELLATION
   const size_t nHalfChunks = nChunks / 2;
 
   pushConstants.extent = cur_chunk.getExtentPos() / float(nChunks);
@@ -316,8 +367,8 @@ TerrainPipeline::drawSubChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& 
     {set.getVkSet(), set1.getVkSet()},
     {}
   );
-
-  const size_t nChunks = std::max(static_cast<uint64_t>(2ul), heightMapResolution / MAX_TESCELLATION);
+  
+  const size_t nChunks = std::max(static_cast<uint64_t>(2ul), static_cast<uint64_t>(2ul)); //FIXME: heightMapResolution / MAX_TESCELLATION
   const size_t nHalfChunks = nChunks / 2;
 
   pushConstants.extent = glob_chunk.getExtentPos() / float(nChunks) / 4.f;
@@ -351,13 +402,9 @@ TerrainPipeline::drawSubChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& 
   }
 }
 
-void TerrainPipeline::loadTextures(SceneManager& scene_mgr)
+void TerrainPipeline::loadTextures(SceneManager&)
 {
-  m_textures[0] = scene_mgr.loadTexture(GRAPHICS_COURSE_RESOURCES_ROOT "/textures/terrain/" "grass.jpg");
-  m_textures[1] = scene_mgr.loadTexture(GRAPHICS_COURSE_RESOURCES_ROOT "/textures/terrain/" "sand.jpg");
-  m_textures[2] = scene_mgr.loadTexture(GRAPHICS_COURSE_RESOURCES_ROOT "/textures/terrain/" "snow.jpg");
-  m_textures[3] = scene_mgr.loadTexture(GRAPHICS_COURSE_RESOURCES_ROOT "/textures/terrain/" "rock.jpg");
-  m_textures[4] = scene_mgr.loadTexture(GRAPHICS_COURSE_RESOURCES_ROOT "/textures/terrain/" "ground.jpg");
+
 }
 
 

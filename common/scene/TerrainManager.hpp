@@ -34,8 +34,8 @@ private:
     ResourceManager& m_resources;
 
     etna::Sampler m_sampler;
-    std::array<Texture::Id, 5> m_textures;
-    // std::array<Material::Id, 5> m_materials; //TODO: 
+    std::array<Texture::Id, 6> m_textures;
+    // std::array<Material::Id, 6> m_materials; //TODO: 
 
     float m_seaLevel = 14.f;
     float m_maxHeight = 64.f;

@@ -24,12 +24,13 @@ void WorldRenderer::allocateResources(glm::uvec2 swapchain_resolution)
 
   backbuffer2.allocate(resolution);
 
-  staticMeshPipeline2.allocate();
-  terrainPipeline2   .allocate();
-  skyboxPipeline2    .allocate();
-  resolveGPipeline2  .allocate();
-  // tonemapPipeline2   .allocate();
-  aaPipeline2        .allocate();
+  staticMeshPipeline2         .allocate();
+  terrainPipeline2            .allocate();
+  terrainTransparentPipeline2 .allocate();
+  skyboxPipeline2             .allocate();
+  resolveGPipeline2           .allocate();
+  // tonemapPipeline2            .allocate();
+  aaPipeline2                 .allocate();
 
   defaultSampler = etna::Sampler({
       .filter = vk::Filter::eLinear,
@@ -61,6 +62,7 @@ void WorldRenderer::loadShaders()
   staticMeshPipeline2.loadShaders();
 
   terrainPipeline2.loadShaders();
+  terrainTransparentPipeline2.loadShaders();
 
   // tonemapPipeline2.loadShaders();
   aaPipeline2.loadShaders();
@@ -75,23 +77,25 @@ void WorldRenderer::loadShaders()
 
 void WorldRenderer::setupPipelines(vk::Format /*swapchain_format*/)
 {
-  staticMeshPipeline2.setup();
-  terrainPipeline2   .setup();
-  skyboxPipeline2    .setup();
-  resolveGPipeline2  .setup();
-  // tonemapPipeline2   .setup();
-  aaPipeline2        .setup();
+  staticMeshPipeline2        .setup();
+  terrainPipeline2           .setup();
+  terrainTransparentPipeline2.setup();
+  skyboxPipeline2            .setup();
+  resolveGPipeline2          .setup();
+  // tonemapPipeline2           .setup();
+  aaPipeline2                .setup();
 }
 
 void WorldRenderer::debugInput(const Keyboard& kb) 
 {
 
-  staticMeshPipeline2.debugInput(kb);
-  terrainPipeline2   .debugInput(kb);
-  skyboxPipeline2    .debugInput(kb);
-  resolveGPipeline2  .debugInput(kb);
-  // tonemapPipeline2   .debugInput(kb);
-  aaPipeline2        .debugInput(kb);
+  staticMeshPipeline2        .debugInput(kb);
+  terrainPipeline2           .debugInput(kb);
+  terrainTransparentPipeline2.debugInput(kb);
+  skyboxPipeline2            .debugInput(kb);
+  resolveGPipeline2          .debugInput(kb);
+  // tonemapPipeline2           .debugInput(kb);
+  aaPipeline2                .debugInput(kb);
 
   if (kb[KeyboardKey::kPause] == ButtonState::Falling)
   {
@@ -197,6 +201,7 @@ void WorldRenderer::renderWorld(
     
     skyboxPipeline2.render(cmd_buf, backbuffer2, renderContext);
     resolveGPipeline2.render(cmd_buf, gbuffer2, renderContext, skyboxPipeline2.getImage());
+    terrainTransparentPipeline2.render(cmd_buf, gbuffer2, renderContext, skyboxPipeline2.getImage());
   }
 
   
@@ -297,7 +302,12 @@ WorldRenderer::drawGui()
     
     if(ImGui::TreeNode("Terrain settings"))
     {
+      ImGui::SeparatorText("Generator");
+      sceneMgr->terrain().drawGui();
+      ImGui::SeparatorText("Solid");
       terrainPipeline2.drawGui();
+      ImGui::SeparatorText("Transparent");
+      terrainTransparentPipeline2.drawGui();
       ImGui::TreePop();
     }
     if(ImGui::TreeNode("StaticMesh renderer settings"))

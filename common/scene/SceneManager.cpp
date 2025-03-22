@@ -19,6 +19,8 @@ SceneManager::SceneManager()
   , m_transferHelper{etna::BlockingTransferHelper::CreateInfo{.stagingSize = 4096 * 4096 * 4}}
 {
   m_resources.init();
+  m_terrain.allocate();
+  m_terrain.loadTextures();
 }
 
 std::optional<tinygltf::Model> SceneManager::loadModel(std::filesystem::path path)

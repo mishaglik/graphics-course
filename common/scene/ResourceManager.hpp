@@ -8,7 +8,7 @@
 
 namespace scene {
 
-class ResourceManger {
+class ResourceManager {
 public:
     void init(); 
 

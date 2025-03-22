@@ -12,6 +12,7 @@
 #include "Material.hpp"
 #include "scene/SingleResourceManager.hpp"
 #include "scene/ResourceManager.hpp"
+#include "scene/TerrainManager.hpp"
 
 // A single render element (relem) corresponds to a single draw call
 // of a certain pipeline with specific bindings (including material data)
@@ -75,7 +76,8 @@ public:
 
   Texture::Id loadTexture(std::filesystem::path path) { return m_resources.loadFromFile(path); }
 
-  scene::ResourceManger& resources() { return m_resources; }
+  scene::ResourceManager& resources() { return m_resources; }
+  scene::TerrainManager& terrain() { return m_terrain; }
 private:
 
   std::optional<tinygltf::Model> loadModel(std::filesystem::path path);
@@ -138,6 +140,7 @@ private:
 
   SingleResourceManager<LightSource> lightSources;
 
-  scene::ResourceManger m_resources;
+  scene::ResourceManager m_resources;
+  scene::TerrainManager m_terrain {m_resources};
 
 };

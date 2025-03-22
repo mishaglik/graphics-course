@@ -18,6 +18,7 @@ SceneManager::SceneManager()
   : oneShotCommands{etna::get_context().createOneShotCmdMgr()}
   , m_transferHelper{etna::BlockingTransferHelper::CreateInfo{.stagingSize = 4096 * 4096 * 4}}
 {
+  m_resources.init();
 }
 
 std::optional<tinygltf::Model> SceneManager::loadModel(std::filesystem::path path)
@@ -167,7 +168,7 @@ glm::mat2x3 SceneManager::getBounds(std::span<const SceneManager::Vertex> vtx) {
   return {center, extent};
 }
 
-SceneManager::ProcessedMeshes SceneManager::processMeshesBaked(const tinygltf::Model& model) const
+SceneManager::ProcessedMeshes SceneManager::processMeshesBaked(const tinygltf::Model& model, const std::vector<Material::Id> material_mapping) const
 {
   // NOTE: glTF assets can have pretty wonky data layouts which are not appropriate
   // for real-time rendering, so we have to press the data first. In serious engines
@@ -239,7 +240,7 @@ SceneManager::ProcessedMeshes SceneManager::processMeshesBaked(const tinygltf::M
         .vertexOffset = static_cast<std::uint32_t>(vrtOffset),
         .indexOffset = static_cast<std::uint32_t>(idxOffset),
         .indexCount = static_cast<std::uint32_t>(model.accessors[prim.indices].count),
-        .materialId = static_cast<Material::Id>(prim.material),
+        .materialId = prim.material == -1 ? Material::Id::Undefined : material_mapping[prim.material],
       });
       result.bounds.emplace_back(getBounds(std::span(result.vertices).subspan(vrtOffset, vrtCount)));
 
@@ -251,7 +252,7 @@ SceneManager::ProcessedMeshes SceneManager::processMeshesBaked(const tinygltf::M
   return result;
 }
 
-SceneManager::ProcessedMeshes SceneManager::processMeshes(const tinygltf::Model& model) const
+SceneManager::ProcessedMeshes SceneManager::processMeshes(const tinygltf::Model& model, const std::vector<Material::Id> material_mapping) const
 {
   // NOTE: glTF assets can have pretty wonky data layouts which are not appropriate
   // for real-time rendering, so we have to press the data first. In serious engines
@@ -350,7 +351,7 @@ SceneManager::ProcessedMeshes SceneManager::processMeshes(const tinygltf::Model&
         .vertexOffset = static_cast<std::uint32_t>(result.vertices.size()),
         .indexOffset = static_cast<std::uint32_t>(result.indices.size()),
         .indexCount = static_cast<std::uint32_t>(accessors[0]->count),
-        .materialId = static_cast<Material::Id>(prim.material),
+        .materialId = prim.material == -1 ? Material::Id::Undefined : material_mapping[prim.material],
       }); 
 
       const std::size_t vertexCount = accessors[1]->count;
@@ -505,9 +506,9 @@ void SceneManager::selectScene(std::filesystem::path path)
     return;
 
   auto model = std::move(*maybeModel);
-  loadModelResources(path.parent_path(), model);
+  auto textureMapping = loadModelResources(path.parent_path(), model);
 
-  processMaterials(model);
+  auto materialMapping = processMaterials(model, textureMapping);
   // By aggregating all SceneManager fields mutations here,
   // we guarantee that we don't forget to clear something
   // when re-loading a scene.
@@ -517,7 +518,7 @@ void SceneManager::selectScene(std::filesystem::path path)
   instanceMatrices = std::move(instMats);
   instanceMeshes = std::move(instMeshes);
 
-  auto [verts, inds, relems, meshs, bbs] = processMeshes(model);
+  auto [verts, inds, relems, meshs, bbs] = processMeshes(model, materialMapping);
 
   renderElements = std::move(relems);
   meshes = std::move(meshs);
@@ -535,9 +536,9 @@ void SceneManager::selectSceneBaked(std::filesystem::path path)
     return;
 
   auto model = std::move(*maybeModel);
-  loadModelResources(path.parent_path(), model);
+  auto textureMapping = loadModelResources(path.parent_path(), model);
 
-  processMaterials(model);
+  auto materialMapping = processMaterials(model, textureMapping);
   // By aggregating all SceneManager fields mutations here,
   // we guarantee that we don't forget to clear something
   // when re-loading a scene.
@@ -547,7 +548,7 @@ void SceneManager::selectSceneBaked(std::filesystem::path path)
   instanceMatrices = std::move(instMats);
   instanceMeshes = std::move(instMeshes);
 
-  auto [verts, inds, relems, meshs, bbs] = processMeshesBaked(model);
+  auto [verts, inds, relems, meshs, bbs] = processMeshesBaked(model, materialMapping);
 
   renderElements = std::move(relems);
   meshes = std::move(meshs);
@@ -624,18 +625,20 @@ void SceneManager::setupLights()
   }
 }
 
-void SceneManager::loadModelResources(std::filesystem::path path, const tinygltf::Model& model)
+std::vector<Texture::Id> SceneManager::loadModelResources(std::filesystem::path path, const tinygltf::Model& model)
 {
-  //! Assume source is always equals texture id.
-  //TODO: Implement properly
+  std::vector<Texture::Id> texIds;
+  texIds.reserve(model.images.size());
   for (auto tex : model.images) {
     auto filepath = path / tex.uri;
-    loadTexture(filepath);
+    texIds.push_back(m_resources.loadFromFile(filepath));
   }
+  return texIds;
 }
 
-void SceneManager::processMaterials(const tinygltf::Model& model) {
-
+std::vector<Material::Id> SceneManager::processMaterials(const tinygltf::Model& model, const std::vector<Texture::Id>& texture_mapping) {
+  std::vector<Material::Id> materialMapping;
+  materialMapping.reserve(model.materials.size());
   for(auto material : model.materials) {
     Material m;
     if (material.pbrMetallicRoughness.baseColorFactor.size() == 4) {
@@ -653,227 +656,33 @@ void SceneManager::processMaterials(const tinygltf::Model& model) {
     m.EMR_Factor.b = static_cast<glm::vec4::value_type>(material.pbrMetallicRoughness.metallicFactor);
 
     if (material.pbrMetallicRoughness.baseColorTexture.index != -1) {
-      m.baseColorTexture = static_cast<decltype(m.baseColorTexture)>(material.pbrMetallicRoughness.baseColorTexture.index);
+      m.baseColorTexture = texture_mapping[material.pbrMetallicRoughness.baseColorTexture.index];
     } else {
-      m.baseColorTexture = getStubTexture();
+      m.baseColorTexture = m_resources.primitiveTexture(0);
     }
 
     if (material.pbrMetallicRoughness.metallicRoughnessTexture.index != -1) {
-      m.metallicRoughnessTexture = static_cast<decltype(m.metallicRoughnessTexture)>(material.pbrMetallicRoughness.metallicRoughnessTexture.index);
+      m.metallicRoughnessTexture = texture_mapping[material.pbrMetallicRoughness.metallicRoughnessTexture.index];
     } else {
-      m.metallicRoughnessTexture = getStubTexture();
+      m.metallicRoughnessTexture = m_resources.primitiveTexture(0);
     }
 
     if (material.normalTexture.index != -1) {
-      m.normalTexture = static_cast<decltype(m.normalTexture)>(material.normalTexture.index);
+      m.normalTexture = texture_mapping[material.normalTexture.index];
     } else {
-      m.normalTexture = getStubBlueTexture();
+      m.normalTexture = m_resources.primitiveTexture(0x4);
     }
-    spdlog::info("New material: {} {{", materials.size());
-    spdlog::info("    .baseColorTexture={}", static_cast<uint32_t>(m.baseColorTexture));
-    spdlog::info("}");
-
-    materials.add(std::move(m));
+    materialMapping.push_back(m_resources.emplaceMaterial(std::move(m)));
   }
+  return materialMapping;
 }
 
 Texture::Id SceneManager::getStubTexture() {
-  if (stubTexture != Texture::Id::Invalid) {
-    return stubTexture;
-  }
-  etna::Image tex = etna::get_context().createImage({
-    .extent = {1, 1, 1},
-    .name = "stub",
-    .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-    .type = vk::ImageType::e2D,
-  });
-
-  auto cmdMgr = etna::get_context().createOneShotCmdMgr();
-  auto cmdBuf = cmdMgr->start();
-  ETNA_CHECK_VK_RESULT(cmdBuf.begin(vk::CommandBufferBeginInfo{}));
-  {
-    etna::RenderTargetState renderTargets(
-      cmdBuf,
-      {{0, 0}, {1, 1}},
-      {{.image=tex.get(), .view=tex.getView({}), .clearColorValue={1.f, 1.f, 1.f, 1.f}}},
-      {}
-    );
-  }
-  etna::set_state(
-    cmdBuf, 
-    tex.get(), 
-    vk::PipelineStageFlagBits2::eAllCommands, 
-    vk::AccessFlagBits2::eShaderSampledRead, 
-    vk::ImageLayout::eShaderReadOnlyOptimal, 
-    vk::ImageAspectFlagBits::eColor
-  );
-  ETNA_CHECK_VK_RESULT(cmdBuf.end());
-  cmdMgr->submitAndWait(cmdBuf);
-  return stubTexture = textures.emplace(std::move(tex));
-}
-
-Texture::Id SceneManager::getStubRedTexture() {
-  if (stubRedTexture != Texture::Id::Invalid) {
-    return stubRedTexture;
-  }
-  etna::Image tex = etna::get_context().createImage({
-    .extent = {1, 1, 1},
-    .name = "stub red",
-    .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-    .type = vk::ImageType::e2D,
-  });
-
-  auto cmdMgr = etna::get_context().createOneShotCmdMgr();
-  auto cmdBuf = cmdMgr->start();
-  ETNA_CHECK_VK_RESULT(cmdBuf.begin(vk::CommandBufferBeginInfo{}));
-  {
-    etna::RenderTargetState renderTargets(
-      cmdBuf,
-      {{0, 0}, {1, 1}},
-      {{.image=tex.get(), .view=tex.getView({}), .clearColorValue={1.f, 0.f, 0.f, 0.f}}},
-      {}
-    );
-  }
-  etna::set_state(
-    cmdBuf, 
-    tex.get(), 
-    vk::PipelineStageFlagBits2::eAllCommands, 
-    vk::AccessFlagBits2::eShaderSampledRead, 
-    vk::ImageLayout::eShaderReadOnlyOptimal, 
-    vk::ImageAspectFlagBits::eColor
-  );
-  ETNA_CHECK_VK_RESULT(cmdBuf.end());
-  cmdMgr->submitAndWait(cmdBuf);
-  return stubRedTexture = textures.emplace(std::move(tex));
-}
-
-Texture::Id SceneManager::getStubBlueTexture() {
-  if (stubBlueTexture != Texture::Id::Invalid) {
-    return stubBlueTexture;
-  }
-  etna::Image tex = etna::get_context().createImage({
-    .extent = {1, 1, 1},
-    .name = "stub blue",
-    .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-    .type = vk::ImageType::e2D,
-  });
-
-  auto cmdMgr = etna::get_context().createOneShotCmdMgr();
-  auto cmdBuf = cmdMgr->start();
-  ETNA_CHECK_VK_RESULT(cmdBuf.begin(vk::CommandBufferBeginInfo{}));
-  {
-    etna::RenderTargetState renderTargets(
-      cmdBuf,
-      {{0, 0}, {1, 1}},
-      {{.image=tex.get(), .view=tex.getView({}), .clearColorValue={0.f, 0.f, 1.f, 0.f}}},
-      {}
-    );
-  }
-  etna::set_state(
-    cmdBuf, 
-    tex.get(), 
-    vk::PipelineStageFlagBits2::eAllCommands, 
-    vk::AccessFlagBits2::eShaderSampledRead, 
-    vk::ImageLayout::eShaderReadOnlyOptimal, 
-    vk::ImageAspectFlagBits::eColor
-  );
-  ETNA_CHECK_VK_RESULT(cmdBuf.end());
-  cmdMgr->submitAndWait(cmdBuf);
-  return stubBlueTexture = textures.emplace(std::move(tex));
+  return Texture::Id::Undefined;
 }
 
 Material::Id SceneManager::getStubMaterial() {
-  if (stubMaterial != Material::Id::Invalid) {
-    return stubMaterial;
-  }
-
-  Material stub = {
-    .baseColorTexture = getStubTexture(),
-    .metallicRoughnessTexture = getStubTexture(),
-    .emissiveFactorTexture = getStubTexture(),
-  };
-
-  return stubMaterial = materials.add(stub);
-}
-
-Texture::Id 
-SceneManager::loadTexture(std::filesystem::path filepath)
-{
-  auto& ctx = etna::get_context();
-  int width, height, nChans;
-  auto uri = filepath.filename().generic_string<char>();
-  auto* imageBytes = stbi_load(filepath.generic_string<char>().c_str(), &width, &height, &nChans, STBI_rgb_alpha);
-  if (imageBytes == nullptr)
-  {
-    spdlog::log(spdlog::level::err, "Image \"{}\" load is unsuccessful", uri);
-    return Texture::Id::Invalid;
-  }
-  size_t size = static_cast<std::size_t>(width * height * 4);
-  
-  auto buf = ctx.createBuffer({
-      .size = static_cast<vk::DeviceSize>(size),
-      .bufferUsage = vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eTransferDst,
-      .name = "tmp load buf",
-  });
-
-  etna::BlockingTransferHelper transferHelper({
-      .stagingSize = size,
-  });
-
-  auto cmdMgr = ctx.createOneShotCmdMgr();
-  transferHelper.uploadBuffer(
-  *cmdMgr, buf, 0, std::span<const std::byte>((std::byte*)imageBytes, size));
-
-  auto img = ctx.createImage({
-      .extent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1},
-      .name = uri,
-      .format = vk::Format::eR8G8B8A8Unorm,
-      .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-  });
-
-  auto cmdBuf = cmdMgr->start();
-  ETNA_CHECK_VK_RESULT(cmdBuf.begin(vk::CommandBufferBeginInfo{}));
-  {
-      etna::set_state(
-          cmdBuf,
-          img.get(),
-          vk::PipelineStageFlagBits2::eTransfer,
-          vk::AccessFlagBits2::eTransferWrite,
-          vk::ImageLayout::eTransferDstOptimal,
-          vk::ImageAspectFlagBits::eColor
-      );
-      etna::flush_barriers(cmdBuf);
-
-
-      vk::BufferImageCopy bic[1]{};
-      bic[0].setImageExtent({static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1});
-      bic[0].setImageOffset({});
-      bic[0].setImageSubresource({
-          .aspectMask = vk::ImageAspectFlagBits::eColor,
-          .layerCount = 1,
-      });
-
-
-      cmdBuf.copyBufferToImage(buf.get(), img.get(), vk::ImageLayout::eTransferDstOptimal, bic);
-
-      etna::set_state(
-          cmdBuf,
-          img.get(),
-          vk::PipelineStageFlagBits2::eFragmentShader,
-          vk::AccessFlagBits2::eShaderRead,
-          vk::ImageLayout::eShaderReadOnlyOptimal,
-          vk::ImageAspectFlagBits::eColor
-      );
-
-      etna::flush_barriers(cmdBuf);
-
-  }
-  ETNA_CHECK_VK_RESULT(cmdBuf.end());
-  cmdMgr->submitAndWait(std::move(cmdBuf));
-  spdlog::info("New texture: {} {{", textures.size());
-  spdlog::info("    .name={}", uri);
-  spdlog::info("}}");
-  return textures.emplace(std::move(img));
+  return Material::Id::Undefined;
 }
 
 

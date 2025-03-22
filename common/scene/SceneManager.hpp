@@ -10,7 +10,7 @@
 
 #include "LightSource.hpp"
 #include "Material.hpp"
-#include "scene/ResourceManager.hpp"
+#include "scene/SingleResourceManager.hpp"
 
 // A single render element (relem) corresponds to a single draw call
 // of a certain pipeline with specific bindings (including material data)
@@ -135,10 +135,10 @@ private:
   etna::Buffer unifiedVbuf;
   etna::Buffer unifiedIbuf;
 
-  ResourceManager<LightSource> lightSources;
+  SingleResourceManager<LightSource> lightSources;
 
-  ResourceManager<Material> materials;
-  ResourceManager<Texture > textures;
+  SingleResourceManager<Material> materials;
+  SingleResourceManager<Texture > textures;
   Texture::Id stubTexture = Texture::Id::Invalid;
   Texture::Id stubRedTexture = Texture::Id::Invalid;
   Texture::Id stubBlueTexture = Texture::Id::Invalid;

@@ -5,15 +5,15 @@
 template<typename T>
 requires requires{ T::Id::Invalid; }
 
-class ResourceManager {
+class SingleResourceManager {
 public:
-    ResourceManager()  = default;
-    ~ResourceManager() = default;
+    SingleResourceManager()  = default;
+    ~SingleResourceManager() = default;
     
-    ResourceManager           (const ResourceManager& oth) = delete;
-    ResourceManager& operator=(const ResourceManager& oth) = delete;
+    SingleResourceManager           (const SingleResourceManager& oth) = delete;
+    SingleResourceManager& operator=(const SingleResourceManager& oth) = delete;
 
-    explicit ResourceManager(std::vector<T> v) : resources(std::move(v)) {}
+    explicit SingleResourceManager(std::vector<T> v) : resources(std::move(v)) {}
 
 
     void reserve(std::size_t n) { resources.reserve(n); }

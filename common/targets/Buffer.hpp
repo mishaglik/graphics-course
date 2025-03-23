@@ -52,5 +52,5 @@ private:
 template<vk::Format FORMAT, vk::ImageUsageFlagBits... flags>
 const std::vector<vk::Format> Buffer<FORMAT, flags...>::COLOR_ATTACHMENT_FORMATS = {FORMAT};
 
-
+using WaterChunk = Buffer<vk::Format::eR16G16Sfloat, vk::ImageUsageFlagBits::eSampled, vk::ImageUsageFlagBits::eStorage>;
 }

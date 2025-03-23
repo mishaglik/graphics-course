@@ -54,15 +54,15 @@ void main()
     vec4 p10 = gl_in[2].gl_Position;
     vec4 p11 = gl_in[3].gl_Position;
     
-    float tstep = 1. / 1024; 
+    float tstep = 1. / 256; 
     float pstep = (p01.z - p00.z) / 4096; 
     
     vec4 p  = (p01 - p00) * u + (p10 - p00) * v + p00;
 
   
-    float h   = seaLevel(p.xz);
-    float hn0 = seaLevel(p.xz + vec2(pstep,    0));
-    float hn1 = seaLevel(p.xz + vec2(   0, pstep));
+    float h   = params.seaLevel + params.maxHeight * length(texture(heightMap, 4 * t.xy).rg                    );
+    float hn0 = params.seaLevel + params.maxHeight * length(texture(heightMap, 4 * t.xy + vec2(tstep,    0)).rg);
+    float hn1 = params.seaLevel + params.maxHeight * length(texture(heightMap, 4 * t.xy + vec2(   0, tstep)).rg);
 
     vec4 pn0 = p + vec4(pstep, 0, 0, 0);
     vec4 pn1 = p + vec4(0, 0, pstep, 0);

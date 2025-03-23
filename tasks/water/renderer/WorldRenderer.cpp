@@ -163,6 +163,8 @@ void WorldRenderer::renderWorld(
       staticMeshPipeline2.render(cmd_buf, gbuffer2, renderContext);
   }
 
+  terrainTransparentPipeline2.prepare(cmd_buf, renderContext);
+
   {
     ETNA_PROFILE_GPU(cmd_buf, renderToBackbuffer);
     etna::set_state(cmd_buf, 

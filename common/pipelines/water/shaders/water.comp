@@ -1,0 +1,149 @@
+#version 450
+#extension GL_ARB_separate_shader_objects : enable
+#extension GL_GOOGLE_include_directive : require
+
+#define LOG2_RESOLUTION 8
+#define RESOLUTION (1u << LOG2_RESOLUTION)
+
+layout(local_size_x = RESOLUTION / 2) in;
+
+layout(binding=0, rg16f) coherent uniform image2D resultImage;
+
+layout(push_constant) uniform params_t
+{
+  float time;
+  vec2  wind;
+} params;
+
+
+float rand(vec2 c){
+	return fract(sin(dot(c.xy, vec2(12.7898,78.233)) + cos(dot(c.xy, vec2(-12315.5767, 3524.56)))) * 43718.5453);
+}
+
+float rand_norm(vec2 c){
+	return 2 * rand(c) - 1;
+}
+
+float ph(vec2 kf, vec2 wind) {
+  return dot(kf, wind) * dot(kf, wind) * exp(-dot(kf, kf)); 
+}
+
+float w(vec2 k) {
+  return sqrt(9.81 * length(k)); 
+}
+
+vec2 src(ivec2 idx, vec2 wind) {
+  vec2 k = vec2(idx) / RESOLUTION;
+
+  vec2 rand_vec  = vec2(rand_norm(vec2(idx + 0 * ivec2(RESOLUTION, RESOLUTION))), rand_norm(vec2(idx + 1 * ivec2(RESOLUTION, RESOLUTION)))); 
+  vec2 rand_vec2 = vec2(rand_norm(vec2(idx + 2 * ivec2(RESOLUTION, RESOLUTION))), rand_norm(vec2(idx + 3 * ivec2(RESOLUTION, RESOLUTION)))); 
+  vec2 h0 = rand_vec  * sqrt(ph( k, wind));
+  vec2 h1 = rand_vec2 * sqrt(ph(-k, wind));
+  float time = params.time;
+  return vec2(
+    (h0.x - h1.x) * cos(time * w(k)) - (h0.y - h1.y) * sin(time * w(k)),
+    (h0.x - h1.x) * sin(time * w(k)) + (h0.y - h1.y) * cos(time * w(k))
+  );
+}
+
+shared float buf_real [RESOLUTION];
+shared float buf_imag [RESOLUTION];
+
+void rev_fft_main() {
+
+  uint x = gl_GlobalInvocationID.x;
+  const float PI = 3.14159267;
+  for (uint s = 1; s <= LOG2_RESOLUTION; s++) {
+    const uint m = 1 << s;
+
+    const uint j = x & ((m / 2) - 1);
+    const uint k = 2 * (x - j) ;
+
+    vec2 w = vec2(cos(2 * PI * j / m), sin(2 * PI * j / m));
+    
+    vec2 t = w * vec2(buf_real[k + j + m/2], buf_imag[k + j + m/2]);
+    vec2 u =     vec2(buf_real[k + j      ], buf_imag[k + j      ]);
+
+    memoryBarrierShared();
+    buf_real[k + j      ] = (u+t).x; 
+    buf_imag[k + j      ] = (u+t).y;
+
+    buf_real[k + j + m/2] = (u-t).x; 
+    buf_imag[k + j + m/2] = (u-t).y;
+    memoryBarrierShared();
+    barrier();
+  }
+}
+
+void rev_fft_row(uint y) {
+  uint x = gl_GlobalInvocationID.x;
+  vec2 val = imageLoad(resultImage, ivec2(x, y)).rg;
+
+  buf_real[bitfieldReverse(x) >> (32 - LOG2_RESOLUTION)] = val.x;
+  buf_imag[bitfieldReverse(x) >> (32 - LOG2_RESOLUTION)] = val.y;
+
+  val = imageLoad(resultImage, ivec2(x + RESOLUTION / 2, y)).rg;
+  buf_real[bitfieldReverse(x+RESOLUTION/2) >> (32 - LOG2_RESOLUTION)] = val.x;
+  buf_imag[bitfieldReverse(x+RESOLUTION/2) >> (32 - LOG2_RESOLUTION)] = val.y;
+  memoryBarrierShared();
+  barrier();
+
+  rev_fft_main();
+  memoryBarrierShared();
+
+  imageStore(resultImage, ivec2(x,                  y), vec4(clamp(buf_real[x                 ], 0, 1), buf_imag[x                 ], 0, 0));
+  memoryBarrierImage();
+  imageStore(resultImage, ivec2(x + RESOLUTION / 2, y), vec4(clamp(buf_real[x + RESOLUTION / 2], 0, 1), buf_imag[x + RESOLUTION / 2], 0, 0));
+  memoryBarrierImage();
+}
+
+void rev_fft_col(uint x) {
+  uint y = gl_GlobalInvocationID.x;
+  vec2 val = imageLoad(resultImage, ivec2(x, y)).rg;
+
+  buf_real[bitfieldReverse(y) >> (32 - LOG2_RESOLUTION)] = val.x;
+  buf_imag[bitfieldReverse(y) >> (32 - LOG2_RESOLUTION)] = val.y;
+
+  val = imageLoad(resultImage, ivec2(x, y + RESOLUTION / 2)).rg;
+  buf_real[bitfieldReverse(y+RESOLUTION/2) >> (32 - LOG2_RESOLUTION)] = val.x;
+  buf_imag[bitfieldReverse(y+RESOLUTION/2) >> (32 - LOG2_RESOLUTION)] = val.y;
+  memoryBarrierShared();
+  barrier();
+
+  rev_fft_main();
+  memoryBarrierShared();
+
+  imageStore(resultImage, ivec2(x, y                 ), vec4(buf_real[y                 ], buf_imag[y                 ], 0, 0));
+  memoryBarrierImage();
+  imageStore(resultImage, ivec2(x, y + RESOLUTION / 2), vec4(buf_real[y + RESOLUTION / 2], buf_imag[y + RESOLUTION / 2], 0, 0));
+  memoryBarrierImage();
+}
+
+void rev_fft_full() {
+  for(uint i = 0; i < RESOLUTION; ++i) {
+    rev_fft_col(i);
+  }
+  memoryBarrierImage();
+  for(uint i = 0; i < RESOLUTION; ++i) {
+    rev_fft_row(i);
+  }
+  memoryBarrierImage();
+}
+
+void fill_src() {
+  for(uint y = 0; y < RESOLUTION; ++y) {
+    uint x = gl_GlobalInvocationID.x;
+    imageStore(resultImage, ivec2(x                 , y), vec4(src(ivec2(x                 , y), params.wind), 0, 0));
+    memoryBarrierImage();
+    imageStore(resultImage, ivec2(x + RESOLUTION / 2, y), vec4(src(ivec2(x + RESOLUTION / 2, y), params.wind), 0, 0));
+    memoryBarrierImage();
+  }
+}
+
+void main(void)
+{  
+  fill_src();
+  rev_fft_full();
+  return;
+
+}

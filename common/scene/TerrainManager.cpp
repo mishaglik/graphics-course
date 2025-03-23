@@ -48,6 +48,7 @@ TerrainManager::allocate() {
       auto& level = m_levels[i];
       level.allocate({32<<i, 32<<i}, heightMapResolution);
     }
+    m_water.allocate({256, 256});
 }
 
 etna::DescriptorSet 

@@ -2,6 +2,7 @@
 
 #include "ResourceManager.hpp"
 #include "Cliplevel.hpp"
+#include "targets/Buffer.hpp"
 
 
 namespace scene {
@@ -30,6 +31,7 @@ public:
 
     void setValid(bool valid) { terrainValid = valid; }
 
+    targets::WaterChunk& water() { return m_water; }
 private:
     ResourceManager& m_resources;
 
@@ -42,6 +44,8 @@ private:
         
     static const std::size_t N_CLIP_LEVELS = 5;
     std::array<terrain::Cliplevel, N_CLIP_LEVELS> m_levels;
+
+    targets::WaterChunk m_water;
 
     int m_terrainScale = 7;
     int m_activeLayers = 3;

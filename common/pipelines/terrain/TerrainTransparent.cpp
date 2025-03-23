@@ -16,6 +16,7 @@ namespace pipes {
 void 
 TerrainTransparentPipeline::allocate()
 {
+  waterGenerator.allocate();
 }
 
 void 
@@ -28,11 +29,13 @@ TerrainTransparentPipeline::loadShaders()
           TERRAIN_PIPELINE_SHADERS_ROOT "terrain_transparent.tese.spv",
           TERRAIN_PIPELINE_SHADERS_ROOT "terrain_transparent.frag.spv"}
     );
+    waterGenerator.loadShaders();
 }
 
 void 
 TerrainTransparentPipeline::setup() 
 {
+    waterGenerator.setup();
     auto& pipelineManager = etna::get_context().getPipelineManager();
 
     pipeline = pipelineManager.createGraphicsPipeline(
@@ -116,13 +119,22 @@ TerrainTransparentPipeline::setup()
 void 
 TerrainTransparentPipeline::drawGui()
 {
-    ImGui::Checkbox("Wireframe sea", &wireframe);
+  if(ImGui::TreeNode("Generator")) {
+    waterGenerator.drawGui();
+    ImGui::TreePop();
+  }
+  ImGui::Checkbox("Update enabled", &updateEnabled);
+  if(ImGui::Button("Update")) {
+    ready = false;
+  }
+  ImGui::SliderFloat("Wave height", &pushConstants.maxHeight, 0, 100);
+  ImGui::Checkbox("Wireframe sea", &wireframe);
 }
 
 void 
-TerrainTransparentPipeline::debugInput(const Keyboard& )
+TerrainTransparentPipeline::debugInput(const Keyboard& kb)
 {
-
+  waterGenerator.debugInput(kb);
 }
 
 void
@@ -132,7 +144,6 @@ TerrainTransparentPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer&,
   pushConstants.mat  = ctx.worldViewProj;
   pushConstants.camPos  = ctx.camPos;
   pushConstants.seaLevel = ctx.sceneMgr->terrain().seaLevel();
-  pushConstants.maxHeight = ctx.sceneMgr->terrain().maxHeight();
   pushConstants.time = ctx.frameTime;
   
   auto& currentPipeline = wireframe ? pipelineDebug : pipeline;
@@ -165,8 +176,7 @@ TerrainTransparentPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer&,
         } else {
           mask = 0xF;
         }
-        // drawChunk(cmd_buf, chunk, mask);
-        drawSubChunk(cmd_buf, level.chunk, {dx, dy}, mask);
+        drawSubChunk(cmd_buf, ctx.sceneMgr->terrain().water(), level.chunk, {dx, dy}, mask);
       }
     } 
   }
@@ -174,15 +184,15 @@ TerrainTransparentPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer&,
 }
 
 void 
-TerrainTransparentPipeline::drawChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& cur_chunk, uint8_t chunk_mask)
-{
+TerrainTransparentPipeline::drawChunk(vk::CommandBuffer cmd_buf, targets::WaterChunk& water, targets::TerrainChunk& cur_chunk, uint8_t chunk_mask)
+{ 
   auto terrainShader = etna::get_shader_program("terrain_transparent");
 
   auto set = etna::create_descriptor_set(
     terrainShader.getDescriptorLayoutId(0),
     cmd_buf,
     {
-      etna::Binding{0, cur_chunk.getImage(0).genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+      etna::Binding{0, water                .genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
       etna::Binding{1, cur_chunk.getImage(1).genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
       etna::Binding{2, cur_chunk.getImage(2).genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)}
     }
@@ -198,7 +208,7 @@ TerrainTransparentPipeline::drawChunk(vk::CommandBuffer cmd_buf, targets::Terrai
     {}
   );
 
-  const size_t nChunks = std::max(static_cast<uint64_t>(2ul), static_cast<uint64_t>(2ul)); //FIXME: heightMapResolution / MAX_TESCELLATION
+  const size_t nChunks = std::max(static_cast<uint64_t>(8ul), static_cast<uint64_t>(2ul)); //FIXME: heightMapResolution / MAX_TESCELLATION
   const size_t nHalfChunks = nChunks / 2;
 
   pushConstants.extent = cur_chunk.getExtentPos() / float(nChunks);
@@ -228,7 +238,7 @@ TerrainTransparentPipeline::drawChunk(vk::CommandBuffer cmd_buf, targets::Terrai
 }
 
 void 
-TerrainTransparentPipeline::drawSubChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& glob_chunk, glm::uvec2 index, uint8_t chunk_mask)
+TerrainTransparentPipeline::drawSubChunk(vk::CommandBuffer cmd_buf, targets::WaterChunk& water, targets::TerrainChunk& glob_chunk, glm::uvec2 index, uint8_t chunk_mask)
 {
   auto terrainShader = etna::get_shader_program("terrain_transparent");
 
@@ -236,7 +246,7 @@ TerrainTransparentPipeline::drawSubChunk(vk::CommandBuffer cmd_buf, targets::Ter
     terrainShader.getDescriptorLayoutId(0),
     cmd_buf,
     {
-      etna::Binding{0, glob_chunk.getImage(0).genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+      etna::Binding{0, water                 .genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
       etna::Binding{1, glob_chunk.getImage(1).genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
       etna::Binding{2, glob_chunk.getImage(2).genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)}
     }
@@ -282,6 +292,35 @@ TerrainTransparentPipeline::drawSubChunk(vk::CommandBuffer cmd_buf, targets::Ter
       chunk_mask >>= 1;
     }
   }
+}
+
+void 
+TerrainTransparentPipeline::prepare (vk::CommandBuffer cmd_buf, const RenderContext& ctx) {
+  if(!updateEnabled && ready)
+    return;
+  etna::set_state(
+    cmd_buf, 
+    ctx.sceneMgr->terrain().water().get(), 
+    vk::PipelineStageFlagBits2::eComputeShader, 
+    vk::AccessFlagBits2::eShaderStorageRead | vk::AccessFlagBits2::eShaderStorageWrite | vk::AccessFlagBits2::eShaderWrite, 
+    vk::ImageLayout::eGeneral, 
+    vk::ImageAspectFlagBits::eColor,
+    ForceSetState::eTrue
+  );
+  etna::flush_barriers(cmd_buf);
+
+  waterGenerator.render(cmd_buf, ctx.sceneMgr->terrain().water(), ctx.frameTime);
+  etna::set_state(
+    cmd_buf, 
+    ctx.sceneMgr->terrain().water().get(), 
+    vk::PipelineStageFlagBits2::eAllCommands, 
+    vk::AccessFlagBits2::eShaderSampledRead | vk::AccessFlagBits2::eShaderRead, 
+    vk::ImageLayout::eShaderReadOnlyOptimal, 
+    vk::ImageAspectFlagBits::eColor,
+    ForceSetState::eTrue
+  );
+  etna::flush_barriers(cmd_buf);
+  ready = true;
 }
 
 } /* namespace pipes */

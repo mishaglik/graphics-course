@@ -25,7 +25,7 @@ float rand_norm(vec2 c){
 }
 
 float ph(vec2 kf, vec2 wind) {
-  return dot(kf, wind) * dot(kf, wind) * exp(-dot(kf, kf)); 
+  return  dot(kf, wind) * dot(kf, wind) * exp(-10 * dot(kf, kf)); 
 }
 
 float w(vec2 k) {
@@ -81,6 +81,7 @@ void rev_fft_row(uint y) {
 
   buf_real[bitfieldReverse(x) >> (32 - LOG2_RESOLUTION)] = val.x;
   buf_imag[bitfieldReverse(x) >> (32 - LOG2_RESOLUTION)] = val.y;
+  memoryBarrierShared();
 
   val = imageLoad(resultImage, ivec2(x + RESOLUTION / 2, y)).rg;
   buf_real[bitfieldReverse(x+RESOLUTION/2) >> (32 - LOG2_RESOLUTION)] = val.x;
@@ -103,6 +104,7 @@ void rev_fft_col(uint x) {
 
   buf_real[bitfieldReverse(y) >> (32 - LOG2_RESOLUTION)] = val.x;
   buf_imag[bitfieldReverse(y) >> (32 - LOG2_RESOLUTION)] = val.y;
+  memoryBarrierShared();
 
   val = imageLoad(resultImage, ivec2(x, y + RESOLUTION / 2)).rg;
   buf_real[bitfieldReverse(y+RESOLUTION/2) >> (32 - LOG2_RESOLUTION)] = val.x;

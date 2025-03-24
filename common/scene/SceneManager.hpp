@@ -76,8 +76,12 @@ public:
 
   Texture::Id loadTexture(std::filesystem::path path) { return m_resources.loadFromFile(path); }
 
+  Texture::Id skybox() { return m_skybox; }
+
   scene::ResourceManager& resources() { return m_resources; }
   scene::TerrainManager& terrain() { return m_terrain; }
+
+  
 private:
 
   std::optional<tinygltf::Model> loadModel(std::filesystem::path path);
@@ -128,7 +132,7 @@ private:
   std::unique_ptr<etna::OneShotCmdMgr> oneShotCommands;
   etna::BlockingTransferHelper m_transferHelper;
 
-  
+  Texture::Id m_skybox;
   std::vector<RenderElement> renderElements;
   std::vector<Mesh> meshes;
   std::vector<glm::mat4x4> instanceMatrices;

@@ -29,14 +29,11 @@ public:
     
     void debugInput(const Keyboard& /*kb*/);
 
-    etna::Image& getImage() { return texture; }
-
     targets::Backbuffer& render(vk::CommandBuffer cmd_buf, targets::Backbuffer& target, const RenderContext& context);
 private: 
     
 private:
     etna::GraphicsPipeline pipeline;
-    etna::Image texture;
     etna::Sampler defaultSampler;
 };
 

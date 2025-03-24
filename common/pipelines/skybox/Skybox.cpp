@@ -16,35 +16,11 @@ namespace pipes {
 void 
 SkyboxPipeline::allocate()
 {
-    auto& ctx = etna::get_context();
-
     defaultSampler = etna::Sampler({
       .filter = vk::Filter::eLinear,
       .name = "perlinSample",
     });
 
-    texture = ctx.createImage({
-        .extent = vk::Extent3D{2048, 2048, 1},
-        .name = "skybox",
-        .format = vk::Format::eB8G8R8A8Srgb,
-        .imageUsage = vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
-        .layers = 6,
-        .flags = vk::ImageCreateFlagBits::eCubeCompatible,
-    });
-
-    for(size_t i = 0; i < 6; ++i) {
-        int width, height, nChans;
-        auto* imageBytes = stbi_load((GRAPHICS_COURSE_RESOURCES_ROOT "/textures/sb-" + std::to_string(i) + ".jpg").c_str(), &width, &height, &nChans, STBI_rgb_alpha);
-        if (imageBytes == nullptr)
-        {
-            spdlog::log(spdlog::level::err, "Skybox load is unsuccessful");
-            return;
-        }
-        size_t size = static_cast<std::size_t>(width * height * 4);
-        etna::BlockingTransferHelper bth({.stagingSize = size});
-
-        bth.uploadImage(*ctx.createOneShotCmdMgr(), texture, 0, static_cast<uint32_t>(i), std::span<const std::byte>(reinterpret_cast<const std::byte*>(imageBytes), size));
-    }
 }
 
 void 
@@ -96,6 +72,7 @@ SkyboxPipeline::debugInput(const Keyboard& /*kb*/)
 targets::Backbuffer& 
 SkyboxPipeline::render(vk::CommandBuffer cmd_buf, targets::Backbuffer& target, const RenderContext& ctx)
 {
+  auto& texture = ctx.sceneMgr->resources()[ctx.sceneMgr->skybox()].image;
   ETNA_PROFILE_GPU(cmd_buf, renderSkybox);
   {
     #if 0

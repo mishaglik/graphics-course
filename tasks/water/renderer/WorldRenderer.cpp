@@ -202,8 +202,8 @@ void WorldRenderer::renderWorld(
     });
     
     skyboxPipeline2.render(cmd_buf, backbuffer2, renderContext);
-    resolveGPipeline2.render(cmd_buf, gbuffer2, renderContext, skyboxPipeline2.getImage());
-    terrainTransparentPipeline2.render(cmd_buf, gbuffer2, renderContext, skyboxPipeline2.getImage());
+    resolveGPipeline2.render(cmd_buf, gbuffer2, renderContext);
+    terrainTransparentPipeline2.render(cmd_buf, gbuffer2, renderContext);
   }
 
   

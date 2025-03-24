@@ -25,7 +25,11 @@ public:
     
         color_buffer = ctx.createImage(etna::Image::CreateInfo{
             .extent = vk::Extent3D{resolution.x, resolution.y, 1},
+        #if defined(__PRETTY_FUNCTION__)
             .name = __PRETTY_FUNCTION__,
+        #else
+            .name = "targets::Buffer",
+        #endif
             .format = COLOR_ATTACHMENT_FORMATS[0],
             .imageUsage = (flags | ... | vk::ImageUsageFlagBits::eColorAttachment),
         });

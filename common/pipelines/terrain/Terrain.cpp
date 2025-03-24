@@ -159,7 +159,7 @@ TerrainPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer& target, con
   pushConstants.camPos  = ctx.camPos;
   pushConstants.seaLevel = ctx.sceneMgr->terrain().seaLevel();
   pushConstants.maxHeight = ctx.sceneMgr->terrain().maxHeight();
-  pushConstants.time = ctx.frameTime;
+  pushConstants.time = static_cast<float>(ctx.frameTime);
     
   auto& currentPipeline = wireframe ? pipelineDebug : pipeline;
   
@@ -205,8 +205,8 @@ TerrainPipeline::regenerateTerrainIfNeeded(vk::CommandBuffer cmd_buf, glm::vec2 
 {
   ETNA_PROFILE_GPU(cmd_buf, terrainGenerator);
   auto levels = terrain.levels();
-  for(std::size_t i = 0; i < levels.size(); ++i) {
-    auto& level = levels[i];
+  for(std::size_t lvl = 0; lvl < levels.size(); ++lvl) {
+    auto& level = levels[lvl];
     glm::ivec2 newPos = static_cast<glm::ivec2>(glm::trunc(pos / level.step));
     if(newPos == level.pos && terrain.isUpToDate()) 
         continue;

@@ -261,7 +261,7 @@ TerrainTransparentPipeline::prepare (vk::CommandBuffer cmd_buf, const RenderCont
   );
   etna::flush_barriers(cmd_buf);
 
-  waterGenerator.render(cmd_buf, ctx.sceneMgr->terrain().water(), ctx.frameTime);
+  waterGenerator.render(cmd_buf, ctx.sceneMgr->terrain().water(), static_cast<float>(ctx.frameTime));
   etna::set_state(
     cmd_buf, 
     ctx.sceneMgr->terrain().water().get(), 

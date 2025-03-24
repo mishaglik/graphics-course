@@ -21,6 +21,31 @@ SceneManager::SceneManager()
   m_resources.init();
   m_terrain.allocate();
   m_terrain.loadTextures();
+  auto& ctx = etna::get_context();
+  etna::Image sbTexture = ctx.createImage({
+      .extent = vk::Extent3D{2048, 2048, 1},
+      .name = "skybox",
+      .format = vk::Format::eB8G8R8A8Srgb,
+      .imageUsage = vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+      .layers = 6,
+      .flags = vk::ImageCreateFlagBits::eCubeCompatible,
+  });
+
+  for(size_t i = 0; i < 6; ++i) {
+      int width, height, nChans;
+      auto* imageBytes = stbi_load((GRAPHICS_COURSE_RESOURCES_ROOT "/textures/sb-" + std::to_string(i) + ".jpg").c_str(), &width, &height, &nChans, STBI_rgb_alpha);
+      if (imageBytes == nullptr)
+      {
+          spdlog::log(spdlog::level::err, "Skybox load is unsuccessful");
+          break;
+      }
+      size_t size = static_cast<std::size_t>(width * height * 4);
+      etna::BlockingTransferHelper bth({.stagingSize = size});
+
+      bth.uploadImage(*ctx.createOneShotCmdMgr(), sbTexture, 0, static_cast<uint32_t>(i), std::span<const std::byte>(reinterpret_cast<const std::byte*>(imageBytes), size));
+  }
+  m_skybox = m_resources.emplaceTexture(std::move(sbTexture));
+
 }
 
 std::optional<tinygltf::Model> SceneManager::loadModel(std::filesystem::path path)

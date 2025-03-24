@@ -30,7 +30,7 @@ public:
     
     void debugInput(const Keyboard& /*kb*/);
 
-    void render(vk::CommandBuffer cmd_buf, targets::GBuffer& source, const RenderContext& context, const etna::Image& skybox);
+    void render(vk::CommandBuffer cmd_buf, targets::GBuffer& source, const RenderContext& context);
 private: 
     void renderLights(vk::CommandBuffer cmd_buf);
     void renderSphereDeferred(vk::CommandBuffer cmd_buf, targets::GBuffer& source, const RenderContext& ctx);

@@ -164,8 +164,10 @@ ResolveGBufferPipeline::debugInput(const Keyboard& /*kb*/)
 }
 
 void
-ResolveGBufferPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer& source, const RenderContext& ctx, const etna::Image& skybox)
+ResolveGBufferPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer& source, const RenderContext& ctx)
 {
+  auto& skybox = ctx.sceneMgr->resources()[ctx.sceneMgr->skybox()].image;
+
   ETNA_PROFILE_GPU(cmd_buf, pipelines_resolvegbuffer_render);
   {
     auto deferredLightShader = etna::get_shader_program("deferred_shader");

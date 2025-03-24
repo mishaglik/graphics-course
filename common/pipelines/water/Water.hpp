@@ -38,7 +38,7 @@ private:
     etna::ComputePipeline pipeline2;
     struct PushConstant {
         float time;
-        glm::vec2 wind = {1.f, 0.f};
+        glm::vec2 wind = {1.f, 0.02f};
     } pushConstant;
 };
 

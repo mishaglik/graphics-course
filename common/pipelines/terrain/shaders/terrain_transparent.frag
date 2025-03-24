@@ -31,6 +31,7 @@ layout(push_constant) uniform params_t
 layout(set=0, binding = 0) uniform sampler2D hmap;
 layout(set=0, binding = 1) uniform sampler2D normalMap;
 layout(set=0, binding = 2) uniform sampler2D tprrMap;
+layout(set=0, binding = 3) uniform samplerCube skybox;
 
 //TODO: Bindless
 layout(set=1, binding = 0) uniform sampler2D grasTexture;
@@ -54,21 +55,51 @@ vec3 hue(float x) {
   
 }
 
+#include "pbr.glsl"
+
+const vec2 resolution = vec2(1280, 720);
+
+vec3 getPos(float depth, float wc) {
+  return vec3(
+    (2 * gl_FragCoord.x / resolution.x) - 1,
+    (2 * gl_FragCoord.y / resolution.y) - 1,
+    depth
+  ) / wc;
+}
+
+vec4 getLight(vec3 lightPos, vec3 pos, vec3 normal, vec3 lightColor, vec3 surfaceColor, vec4 material)
+{
+  const vec3 lightDir   = normalize(lightPos - pos);
+  return vec4(pbr_light(surfaceColor, pos, normal, normalize(lightPos), material, lightColor), 1.f);
+}
+
+vec3 pbrWater(vec3 surfaceColor)
+{
+  vec3 normal = surf.normal.xyz;
+  if(length(normal) < 0.5)
+    normal = vec3(0, 1, 0);
+  const vec3 absNormal = normalize(normal);
+
+  normal = normalize(normal);
+  
+  const vec3 pos = vec3(surf.worldCoord.x, surf.height, surf.worldCoord.y);
+  
+  const vec4 mat = vec4(0.4);
+  
+  const vec3 lightPos = (vec4(-150, 100, -200, 0)).xyz;
+
+  const vec3 reflection = texture(skybox, (pos - 2 * normal * dot(normal, pos))).rgb;
+
+  return getLight(lightPos, pos, normal, reflection, surfaceColor, mat).rgb;
+}
 
 void main(void)
 {
-  //out_fragColor = fract(surf.texCoord.x * 64.) < 0.5 ? vec4(1., 0., 0., 0) : vec4(0., 1., 0., 0);
-  //out_fragColor = vec4(gl_FragCoord.z, depthToDist(gl_FragCoord.z) / far, 1., 0);
   
-  // out_fragColor.rgb = heightColor(surf.height);
-  // out_fragColor.rgb = heightColor(texture(tprrMap, surf.texCoord).r);
   vec4 tpxx   = texture(tprrMap, surf.texCoord);
   vec3 color = vec3(0.01, 0.01, 0.71) + vec3(0, tpxx.r / 4, -tpxx.r / 4);
-  color = color * max(0.1, dot(normalize(surf.normal.rgb), vec3(0, 1, 0)));
-  out_fragColor = vec4(color, 0.9);
-  // out_fragColor.rgb = surf.normal.rgb;
-  // out_fragColor.g = 0;
-  // out_fragNormal = vec4(surf.normal.rgb, 0);
-  // out_fragWc = gl_FragCoord.w;
-  // out_fragMaterial  = heightMaterial(surf.height);
+  // color = color * max(0.1, dot(normalize(surf.normal.rgb), vec3(0, 1, 0)));
+  color = pbrWater(color);
+  out_fragColor = vec4(color, 0.99);
+  
 }

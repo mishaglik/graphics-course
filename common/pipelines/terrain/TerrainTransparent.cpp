@@ -149,7 +149,7 @@ TerrainTransparentPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer&,
   pushConstants.mat  = ctx.worldViewProj;
   pushConstants.camPos  = ctx.camPos;
   pushConstants.seaLevel = ctx.sceneMgr->terrain().seaLevel();
-  pushConstants.time = ctx.frameTime;
+  pushConstants.time = static_cast<float>(ctx.frameTime);
   
   auto& currentPipeline = wireframe ? pipelineDebug : pipeline;
   

@@ -14,6 +14,7 @@ layout(push_constant) uniform pc_t
 {
     mat4 mProjView;
     mat4 mView;
+    mat4 lightMatrix;
     vec4 pos;
     vec4 color;
     float degree;

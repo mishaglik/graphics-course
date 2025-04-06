@@ -35,6 +35,9 @@ public:
     void reserve(std::size_t n) { nInstances.assign(n, 0); }
 
     RenderTarget& render(vk::CommandBuffer cmd_buf, RenderTarget& target, const RenderContext& context);
+
+    void renderShadow(vk::CommandBuffer cmd_buf, const RenderContext& context);
+
 private: 
 
 
@@ -42,6 +45,7 @@ private:
 
 private:
     etna::GraphicsPipeline pipeline;
+    etna::GraphicsPipeline shadowPipeline;
     etna::Buffer instanceMatricesBuf;
     etna::Sampler defaultSampler;
     struct PushConstants

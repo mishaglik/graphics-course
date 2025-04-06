@@ -96,6 +96,9 @@ void Renderer::debugInput(const Keyboard& kb)
 void Renderer::update(const FramePacket& packet)
 {
   pos = packet.mainCam.position;
+  mat = packet.mainCam.viewItm();
+  const float aspect = float(resolution.x) / float(resolution.y);
+  mat2 = packet.mainCam.projTm(aspect);
   worldRenderer->update(packet);
 }
 
@@ -108,6 +111,20 @@ void Renderer::drawFrame()
     guiRenderer->nextFrame();
     ImGui::NewFrame();
     ImGui::InputFloat3("Position", &pos.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+    if(ImGui::TreeNode("View matrix")) {
+      ImGui::InputFloat4("r0x", &mat[0][0], "%.3f", ImGuiInputTextFlags_ReadOnly);
+      ImGui::InputFloat4("r1x", &mat[1][0], "%.3f", ImGuiInputTextFlags_ReadOnly);
+      ImGui::InputFloat4("r2x", &mat[2][0], "%.3f", ImGuiInputTextFlags_ReadOnly);
+      ImGui::InputFloat4("r3x", &mat[3][0], "%.3f", ImGuiInputTextFlags_ReadOnly);
+      ImGui::TreePop();
+    }
+    if(ImGui::TreeNode("Proj matrix")) {
+      ImGui::InputFloat4("r0x", &mat2[0][0], "%.3f", ImGuiInputTextFlags_ReadOnly);
+      ImGui::InputFloat4("r1x", &mat2[1][0], "%.3f", ImGuiInputTextFlags_ReadOnly);
+      ImGui::InputFloat4("r2x", &mat2[2][0], "%.3f", ImGuiInputTextFlags_ReadOnly);
+      ImGui::InputFloat4("r3x", &mat2[3][0], "%.3f", ImGuiInputTextFlags_ReadOnly);
+      ImGui::TreePop();
+    }
     worldRenderer->drawGui();
     ImGui::Render();
   }

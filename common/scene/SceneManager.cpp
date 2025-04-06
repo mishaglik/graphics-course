@@ -617,7 +617,7 @@ static glm::vec4 randomColor() {
 void SceneManager::setupLights()
 {
 
-  lightSources.add(/* 0*/  {{0.f, 40.f, 0.f,  0.f}, glm::vec4(0.6, 0.6, 0.6, 1.), 0.f});
+  lightSources.add(/* 0*/  {{-150, 100, -200,  0.f}, glm::vec4(0.6, 0.6, 0.6, 1.), 0.f});
 #if 0
   const float lampRange = 2.5f;
   const glm::vec4 lampColor = glm::vec4(0.8, 0.8, 0, 1);

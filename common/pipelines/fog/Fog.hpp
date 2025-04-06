@@ -51,7 +51,7 @@ private:
         int integralSteps = 20;
     } pushConstants;
 
-    float alpha = 0.3;
+    float alpha = 0.3f;
     glm::vec2 wind = {0.3f, 1.f};
     etna::Sampler defaultSampler;
     etna::Sampler linearSampler;

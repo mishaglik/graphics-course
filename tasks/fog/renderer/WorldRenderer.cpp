@@ -31,6 +31,7 @@ void WorldRenderer::allocateResources(glm::uvec2 swapchain_resolution)
   resolveGPipeline2           .allocate();
   // tonemapPipeline2            .allocate();
   aaPipeline2                 .allocate();
+  fogPipeline2                .allocate();
 
   defaultSampler = etna::Sampler({
       .filter = vk::Filter::eLinear,
@@ -40,6 +41,7 @@ void WorldRenderer::allocateResources(glm::uvec2 swapchain_resolution)
   // regenTerrain();
   
   gbuffer2.allocate(resolution);
+  fogbuffer2.allocate(resolution / 2u);
 }
 
 
@@ -63,14 +65,14 @@ void WorldRenderer::loadShaders()
 
   terrainPipeline2.loadShaders();
   terrainTransparentPipeline2.loadShaders();
-
+  
   // tonemapPipeline2.loadShaders();
   aaPipeline2.loadShaders();
-
+  
   skyboxPipeline2.loadShaders();
-
+  
+  fogPipeline2.loadShaders();
   resolveGPipeline2.loadShaders();
-
   // etna::create_program("static_mesh", {IMGUI_RENDERER_SHADERS_ROOT "static_mesh.vert.spv"});
   spdlog::info("Shaders loaded");
 }
@@ -82,6 +84,7 @@ void WorldRenderer::setupPipelines(vk::Format /*swapchain_format*/)
   terrainTransparentPipeline2.setup();
   skyboxPipeline2            .setup();
   resolveGPipeline2          .setup();
+  fogPipeline2               .setup();
   // tonemapPipeline2           .setup();
   aaPipeline2                .setup();
 }
@@ -93,6 +96,7 @@ void WorldRenderer::debugInput(const Keyboard& kb)
   terrainPipeline2           .debugInput(kb);
   terrainTransparentPipeline2.debugInput(kb);
   skyboxPipeline2            .debugInput(kb);
+  fogPipeline2               .debugInput(kb);
   resolveGPipeline2          .debugInput(kb);
   // tonemapPipeline2           .debugInput(kb);
   aaPipeline2                .debugInput(kb);
@@ -111,10 +115,16 @@ void WorldRenderer::update(const FramePacket& packet)
 
   if (shadowCamSync) {
     auto& sun = sceneMgr->getLights()[LightSource::Id::Sun];
+    glm::vec3 target = packet.mainCam.position + packet.mainCam.forward() * (14.f - packet.mainCam.position.y) / std::min(0.1f, glm::dot(packet.mainCam.forward(), glm::vec3{0, 1, 0}));
+    shadow.camera.lookAt(sun.position, target, {0, 1 ,0}); //TODO: sync with current view 
+    // float length = glm::distance(shadow.camera.position, target) - glm::distance(target, packet.mainCam.position);
+    // shadow.camera.move(shadow.camera.forward() * length);
+    shadow.lightTargetDist = 2 * glm::distance(shadow.camera.position, target);
+  } else {
+    auto& sun = sceneMgr->getLights()[LightSource::Id::Sun];
     glm::vec3 target{16, 14, -64};
     shadow.camera.lookAt(sun.position, target, {0, 1 ,0}); //TODO: sync with current view 
-    float length = glm::distance(shadow.camera.position, target) - glm::distance(target, packet.mainCam.position);
-    shadow.camera.move(shadow.camera.forward() * length);
+    shadow.lightTargetDist = 1.2 * glm::distance(shadow.camera.position, target);
   }
   // calc camera matrix
   {
@@ -123,6 +133,7 @@ void WorldRenderer::update(const FramePacket& packet)
     const float aspect = float(resolution.x) / float(resolution.y);
     renderContext.worldViewProj = camera.projTm(aspect) * camera.viewTm();
     renderContext.worldView = camera.viewTm();
+    renderContext.worldIView = camera.viewItm();
     renderContext.worldProj = camera.projTm(aspect);
     renderContext.camPos = camera.position;
   }
@@ -132,7 +143,7 @@ void WorldRenderer::update(const FramePacket& packet)
   {
     const auto mProj = shadow.usePerspectiveM
       ? glm::perspectiveLH_ZO(
-          -glm::radians(shadow.camera.fov), 1.0f, 1.0f, shadow.lightTargetDist * 2.0f)
+          -glm::radians(packet.mainCam.fov), 1.0f, 1.0f, shadow.lightTargetDist * 2.0f)
       : glm::orthoLH_ZO(
           +shadow.radius,
           -shadow.radius,
@@ -142,11 +153,11 @@ void WorldRenderer::update(const FramePacket& packet)
           shadow.lightTargetDist);
 
     renderContext.lightViewProj = mProj * shadow.camera.viewTm();
-
   }
 
+  renderContext.dt = static_cast<float>(packet.currentTime - renderContext.frameTime);
   if(!pause) {
-    renderContext.frameTime = packet.currentTime; 
+    renderContext.frameTime = packet.currentTime;
   }
   
 }
@@ -230,18 +241,12 @@ void WorldRenderer::renderWorld(
     cmd_buf.clearDepthStencilImage(gbuffer2.shadow().get(), vk::ImageLayout::eTransferDstOptimal, clear, range);
   }
 
+
+
   terrainTransparentPipeline2.prepare(cmd_buf, renderContext);
 
   {
-    ETNA_PROFILE_GPU(cmd_buf, renderToBackbuffer);
-    etna::set_state(cmd_buf, 
-      backbuffer2.get(), 
-      vk::PipelineStageFlagBits2::eColorAttachmentOutput, 
-      {}, 
-      vk::ImageLayout::eColorAttachmentOptimal, 
-      vk::ImageAspectFlagBits::eColor
-    );
-  
+    
     for(std::size_t i = 0; i < targets::GBuffer::N_COLOR_ATTACHMENTS; i++) {
       etna::set_state(cmd_buf, 
         gbuffer2.getImage(i).get(), 
@@ -265,7 +270,45 @@ void WorldRenderer::renderWorld(
       vk::ImageLayout::eShaderReadOnlyOptimal, 
       vk::ImageAspectFlagBits::eDepth
     );
-    
+    etna::flush_barriers(cmd_buf);
+  }
+  {
+    ETNA_PROFILE_GPU(cmd_buf, renderFog);
+    etna::set_state(cmd_buf, 
+      fogbuffer2.get(), 
+      vk::PipelineStageFlagBits2::eColorAttachmentOutput, 
+      {}, 
+      vk::ImageLayout::eColorAttachmentOptimal, 
+      vk::ImageAspectFlagBits::eColor
+    );
+    etna::flush_barriers(cmd_buf);
+    etna::RenderTargetState renderTargets({
+      cmd_buf,
+      {{0, 0}, {resolution.x / 2, resolution.y / 2}},
+      fogbuffer2.getColorAttachments(),
+      fogbuffer2.getDepthAttachment(),
+      {}
+    });
+    fogPipeline2.render(cmd_buf, gbuffer2, renderContext);
+  }
+  { 
+    ETNA_PROFILE_GPU(cmd_buf, renderToBackbuffer);
+
+    etna::set_state(cmd_buf, 
+      backbuffer2.get(), 
+      vk::PipelineStageFlagBits2::eColorAttachmentOutput, 
+      {}, 
+      vk::ImageLayout::eColorAttachmentOptimal, 
+      vk::ImageAspectFlagBits::eColor
+    );
+  
+    etna::set_state(cmd_buf, 
+      fogbuffer2.get(), 
+      vk::PipelineStageFlagBits2::eFragmentShader, 
+      {}, 
+      vk::ImageLayout::eShaderReadOnlyOptimal, 
+      vk::ImageAspectFlagBits::eColor
+    );
     etna::flush_barriers(cmd_buf);
     etna::RenderTargetState renderTargets({
       cmd_buf,
@@ -278,15 +321,18 @@ void WorldRenderer::renderWorld(
     skyboxPipeline2.render(cmd_buf, backbuffer2, renderContext);
     resolveGPipeline2.render(cmd_buf, gbuffer2, renderContext);
     terrainTransparentPipeline2.render(cmd_buf, gbuffer2, renderContext);
+    fogPipeline2.renderResolve(cmd_buf, fogbuffer2, renderContext);
   }
 
-  
+
   renderPostprocess(cmd_buf, target_image, target_image_view);
 }
 
 void WorldRenderer::renderPostprocess(
   vk::CommandBuffer cmd_buf, vk::Image target_image, vk::ImageView target_image_view)
 {
+
+
   ETNA_PROFILE_GPU(cmd_buf, renderWorld);
   if(!aaPipeline2.enabled())
   {
@@ -305,6 +351,7 @@ void WorldRenderer::renderPostprocess(
       vk::ImageAspectFlagBits::eColor
     );
     etna::flush_barriers(cmd_buf);
+
     std::array<vk::Offset3D, 2> offs = {
         vk::Offset3D{},
         vk::Offset3D{.x =static_cast<int32_t>(resolution.x), .y=static_cast<int32_t>(resolution.y), .z = 1}
@@ -407,6 +454,8 @@ WorldRenderer::drawGui()
       }
       ImGui::SeparatorText("Resolve G buffer");
       resolveGPipeline2.drawGui();
+      ImGui::SeparatorText("Fog");
+      fogPipeline2.drawGui();
       ImGui::TreePop();
     }
     

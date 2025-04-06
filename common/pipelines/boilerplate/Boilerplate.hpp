@@ -29,7 +29,7 @@ public:
     
     void debugInput(const Keyboard& /*kb*/);
 
-    void render(vk::CommandBuffer cmd_buf, RenderTarget& target, const RenderContext& context);
+    void render(vk::CommandBuffer cmd_buf, const RenderContext& context);
 private: 
     
 private:

@@ -20,12 +20,24 @@ public:
     glm::uvec2 getResolution();
 
     etna::Image& getImage(std::size_t i);
+    const etna::Image& getImage(std::size_t i) const;
     etna::Image& getDepthImage() { return depth_buffer; }
+    const etna::Image& getDepthImage() const { return depth_buffer; }
 
+    
+    
     ShadowMap& shadow() {return shadowMap; }
-
+    
     void allocate(glm::uvec2 extent);
+    
+    enum class ImageId {
+        Albedo   = 0,
+        Normal   = 1,
+        Material = 2,
+        Wc       = 3,
+    };
 
+    const etna::Image& getImage(ImageId id) const { return color_buffer[static_cast<std::size_t>(id)]; }
 private:
     std::array<etna::Image, N_COLOR_ATTACHMENTS> color_buffer;
 

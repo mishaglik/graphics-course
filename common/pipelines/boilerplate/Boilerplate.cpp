@@ -58,18 +58,10 @@ AAPipeline::debugInput(const Keyboard& /*kb*/)
 }
 
 void
-AAPipeline::render(vk::CommandBuffer cmd_buf, RenderTarget& target, const RenderContext& ctx)
+AAPipeline::render(vk::CommandBuffer cmd_buf, const RenderContext& ctx)
 {
   ETNA_PROFILE_GPU(cmd_buf, pipelines_boilerplate_render);
   {
-    etna::RenderTargetState renderTargets(
-      cmd_buf,
-      {{0, 0}, {target.getResolution().x, target.getResolution().y}},
-      target.getColorAttachments(),
-      target.getDepthAttachment(),
-      {}
-    );
-
     auto boilerplateShader = etna::get_shader_program("boilerplate_shader");
 
     cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.getVkPipeline());

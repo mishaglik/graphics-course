@@ -4,3 +4,4 @@
 #include "pipelines/skybox/Skybox.hpp"
 #include "pipelines/static_mesh/StaticMesh.hpp"
 #include "pipelines/aa/AA.hpp"
+#include "pipelines/fog/Fog.hpp"

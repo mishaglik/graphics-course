@@ -44,7 +44,7 @@ public:
 
     vk::Image get() { return color_buffer.get(); }
 
-    etna::ImageBinding genBinding(vk::Sampler sampler, vk::ImageLayout layout) {return color_buffer.genBinding(sampler, layout);}
+    etna::ImageBinding genBinding(vk::Sampler sampler, vk::ImageLayout layout) const {return color_buffer.genBinding(sampler, layout);}
 
 private:
     etna::Image color_buffer;
@@ -57,6 +57,7 @@ template<vk::Format FORMAT, vk::ImageUsageFlagBits... flags>
 const std::vector<vk::Format> Buffer<FORMAT, flags...>::COLOR_ATTACHMENT_FORMATS = {FORMAT};
 
 using WaterChunk = Buffer<vk::Format::eR16G16Sfloat, vk::ImageUsageFlagBits::eSampled, vk::ImageUsageFlagBits::eStorage>;
+using FogBuffer = Buffer<vk::Format::eB10G11R11UfloatPack32, vk::ImageUsageFlagBits::eSampled>;
 
 template<vk::Format FORMAT, vk::ImageUsageFlagBits... flags>
 class BufferDepth {

@@ -37,6 +37,7 @@ private:
 
   glm::uvec2 resolution;
   glm::vec3 pos;
+  glm::mat4x4 mat, mat2;
   bool useVsync = true;
 
   std::unique_ptr<WorldRenderer> worldRenderer;

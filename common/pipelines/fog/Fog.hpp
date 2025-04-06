@@ -46,8 +46,8 @@ private:
         glm::vec2 shift;
         float horizon = 100;
         float precision = 10;
-        float frequency = 0.1;
-        float rarity = 0.6;
+        float frequency = 0.1f;
+        float rarity = 0.6f;
         int integralSteps = 20;
     } pushConstants;
 

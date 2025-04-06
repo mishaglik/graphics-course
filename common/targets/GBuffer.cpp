@@ -55,6 +55,8 @@ GBuffer::allocate(glm::uvec2 extent)
     .view  = depth.getView({}),
     .imageAspect = vk::ImageAspectFlagBits::eDepth,
   };
+  
+  shadowMap.allocate({2048, 2048});
 }
 
 etna::Image&

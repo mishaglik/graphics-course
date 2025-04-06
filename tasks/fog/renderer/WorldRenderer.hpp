@@ -60,10 +60,6 @@ public:
   private:
   std::unique_ptr<SceneManager> sceneMgr;
 
-  std::array<etna::Image, 5> gBuffer;
-  std::vector<etna::RenderTargetState::AttachmentParams> gBufferColorAttachments;
-  etna::RenderTargetState::AttachmentParams gBufferDepthAttachment;
-
   etna::Buffer constants;
   
   pipes::TerrainPipeline    terrainPipeline2{};
@@ -85,6 +81,16 @@ public:
   glm::uvec2 resolution;
 
   etna::Image skybox;
+  
+  
+  struct ShadowMapCam
+  {
+    Camera camera;
+    float radius = 10;
+    float lightTargetDist = 24;
+    bool usePerspectiveM = false;
+  } shadow;
+
 
   struct RenderGroup {
     RenderElement re;
@@ -94,5 +100,6 @@ public:
   bool pause = false;
 
   bool enableStaticMesh = true;
-  
+  bool enableShadow = true;
+  bool shadowCamSync = true;
 };

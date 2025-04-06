@@ -68,4 +68,14 @@ GBuffer::getImage(std::size_t i)
   return color_buffer[i];
 }
 
+
+const etna::Image&
+GBuffer::getImage(std::size_t i) const
+{
+  if (i == N_COLOR_ATTACHMENTS) {
+    return depth_buffer;
+  }
+  return color_buffer[i];
+}
+
 }

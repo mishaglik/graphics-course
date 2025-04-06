@@ -67,6 +67,7 @@ public:
   pipes::StaticMeshPipeline staticMeshPipeline2{};
   
   pipes::SkyboxPipeline         skyboxPipeline2{};
+  pipes::FogPipeline            fogPipeline2 {};
   pipes::ResolveGBufferPipeline resolveGPipeline2{};
 
   pipes::TonemapPipeline tonemapPipeline2{};
@@ -75,6 +76,7 @@ public:
   pipes::RenderContext renderContext{};
 
   targets::Backbuffer backbuffer2{};
+  targets::FogBuffer fogbuffer2{};
   targets::GBuffer gbuffer2{};
 
   etna::Sampler defaultSampler;

@@ -50,8 +50,8 @@ float shadow(vec3 pos) {
   const vec2 shadowTexCoord = posLightSpaceNDC.xy*0.5f + vec2(0.5f, 0.5f);
 
   const bool  outOfView = (shadowTexCoord.x < 0.0001f || shadowTexCoord.x > 0.9999f || shadowTexCoord.y < 0.0091f || shadowTexCoord.y > 0.9999f);
-  // if(outOfView)
-  //   out_fragColor.g = 1;
+  if(outOfView)
+    out_fragColor.r = 1;
   return ((posLightSpaceNDC.z < textureLod(shadowMap, shadowTexCoord, 0).x + 0.001f) || outOfView) ? 1.0f : 0.0f;
 }
 

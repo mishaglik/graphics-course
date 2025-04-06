@@ -19,6 +19,7 @@ layout(push_constant) uniform pc_t
 {
     mat4 mProj;
     mat4 mView;
+    mat4 lightMatrix;
     vec4 pos;
     vec4 color;
     float degree;
@@ -40,7 +41,7 @@ vec4 getLight(vec3 pos, vec3 normal, vec3 lightColor, vec3 lightDir, vec3 surfac
 {
   if(dot(normal, normalize(-lightDir)) < 0)
     return vec4(0);
-  return vec4(lightColor * pbr_light(surfaceColor, pos, normal, normalize(-lightDir), material, vec3(1, 1, 1)), 1.f);
+  return vec4(lightColor * pbr_light(surfaceColor, pos, normal, normalize(-lightDir), material, vec3(1, 1, 1), 1.f), 1.f);
 }
 
 void main(void)

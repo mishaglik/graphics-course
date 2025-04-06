@@ -184,7 +184,9 @@ ResolveGBufferPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer& sour
         etna::Binding{2, source.getImage(2).genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
         etna::Binding{3, source.getImage(3).genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
         etna::Binding{4, source.getImage(4).genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
-        etna::Binding{5, skybox.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal, {.layerCount=6, .type=vk::ImageViewType::eCube})}
+        etna::Binding{5, skybox.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal, {.layerCount=6, .type=vk::ImageViewType::eCube})},
+        etna::Binding{6, source.shadow().genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)}
+
       }
     );
     
@@ -196,8 +198,7 @@ ResolveGBufferPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer& sour
       {}
     );
 
-    LightSource::Id sunId = static_cast<LightSource::Id>(0);
-    struct {glm::mat4x4 p, v; glm::vec4 pos, color; int pbr;} pushConstants{ctx.worldProj, ctx.worldView, ctx.sceneMgr->getLights()[sunId].position, ctx.sceneMgr->getLights()[sunId].colorRange, usePbr ? 1 : 0};
+    struct {glm::mat4x4 p, v, l; glm::vec4 pos, color; int pbr;} pushConstants{ctx.worldProj, ctx.worldView, ctx.lightViewProj, ctx.sceneMgr->getLights()[LightSource::Id::Sun].position, ctx.sceneMgr->getLights()[LightSource::Id::Sun].colorRange, usePbr ? 1 : 0};
 
     cmd_buf.pushConstants(
       pipeline.getVkPipelineLayout(), 
@@ -253,7 +254,7 @@ void ResolveGBufferPipeline::renderSphereDeferred(vk::CommandBuffer cmd_buf, tar
       continue;
     }
     n = std::min(n, 128u);
-    struct {glm::mat4x4 pv, v; glm::vec4 pos, color; float degree; int pbr;} pushConstants{ctx.worldProj, ctx.worldView, light.position, light.colorRange, M_PIf / n, usePbr ? 1 : 0};
+    struct {glm::mat4x4 pv, v, l; glm::vec4 pos, color; float degree; int pbr;} pushConstants{ctx.worldProj, ctx.worldView, {}, light.position, light.colorRange, M_PIf / n, usePbr ? 1 : 0};
     pushConstants.pos += light.floatingAmplitude * glm::sin(light.floatingSpeed * static_cast<float>(ctx.frameTime));
     pushConstants.pos.w = light.position.w;
     cmd_buf.pushConstants(
@@ -282,7 +283,7 @@ void ResolveGBufferPipeline::renderSphere(vk::CommandBuffer cmd_buf, const Rende
     if (n == 0) continue;
     n = std::min(n, 128u);
     n = std::max(n,   5u);
-    struct {glm::mat4x4 pv, v; glm::vec4 pos, color; float degree;} pushConstants{ctx.worldProj, ctx.worldView, light.position, light.colorRange, M_PIf / n};
+    struct {glm::mat4x4 pv, v, l; glm::vec4 pos, color; float degree;} pushConstants{ctx.worldProj, ctx.worldView, {}, light.position, light.colorRange, M_PIf / n};
     pushConstants.pos.w = light.visibleRadius;
     pushConstants.pos += light.floatingAmplitude * glm::sin(light.floatingSpeed * static_cast<float>(ctx.frameTime));
     cmd_buf.pushConstants(

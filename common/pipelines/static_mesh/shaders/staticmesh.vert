@@ -32,8 +32,6 @@ layout (location = 0 ) out VS_OUT
 layout (std140, set = 0, binding = 0) readonly buffer ims_t {
   mat4 mModels[]; 
 } ims;
-layout(set = 1, binding = 0) uniform sampler2D baseColorTexture;
-layout(set = 1, binding = 1) uniform sampler2D    normalTexture;
 
 out gl_PerVertex { vec4 gl_Position; };
 

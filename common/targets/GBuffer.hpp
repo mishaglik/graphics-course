@@ -3,10 +3,13 @@
 #include "etna/Image.hpp"
 #include "etna/RenderTargetStates.hpp"
 #include <glm/glm.hpp>
+
+#include "Buffer.hpp"
 namespace targets {
 
 class GBuffer {
 public:
+    using Shadow = ShadowMap;
     static const std::vector<vk::Format> COLOR_ATTACHMENT_FORMATS;// = {vk::Format::eB10G11R11UfloatPack32};
     static const vk::Format              DEPTH_ATTACHMENT_FORMAT  = vk::Format::eD32Sfloat;
     static const constexpr int N_COLOR_ATTACHMENTS = 4;
@@ -19,6 +22,8 @@ public:
     etna::Image& getImage(std::size_t i);
     etna::Image& getDepthImage() { return depth_buffer; }
 
+    ShadowMap& shadow() {return shadowMap; }
+
     void allocate(glm::uvec2 extent);
 
 private:
@@ -29,6 +34,7 @@ private:
     
     etna::Image depth_buffer;
     glm::uvec2 resolution;
+    ShadowMap shadowMap;
 };
 
 }

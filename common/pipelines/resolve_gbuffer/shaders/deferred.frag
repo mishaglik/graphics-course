@@ -17,10 +17,13 @@ layout(binding = 3) uniform sampler2D wc;
 layout(binding = 4) uniform sampler2D depth;
 layout(binding = 5) uniform samplerCube skybox;
 
+layout(binding = 6) uniform sampler2D shadowMap;
+
 layout(push_constant) uniform pc_t
 {
     mat4 mProj;
     mat4 mView;
+    mat4 lightMatrix;
     vec4 position;
     vec4 color;
     int pbr;
@@ -38,13 +41,29 @@ vec3 getPos(float depth, float wc) {
   ) / wc;
 }
 
+float shadow(vec3 pos) {
+  pos = inverse(mat3(params.mView)) * (pos - (params.mView * vec4(0,0,0,1)).xyz);
+  const vec4 posLightClipSpace = params.lightMatrix*vec4(pos, 1.0f);
+
+  const vec3 posLightSpaceNDC = posLightClipSpace.xyz/posLightClipSpace.w;
+  
+  const vec2 shadowTexCoord = posLightSpaceNDC.xy*0.5f + vec2(0.5f, 0.5f);
+
+  const bool  outOfView = (shadowTexCoord.x < 0.0001f || shadowTexCoord.x > 0.9999f || shadowTexCoord.y < 0.0091f || shadowTexCoord.y > 0.9999f);
+  // if(outOfView)
+  //   out_fragColor.g = 1;
+  return ((posLightSpaceNDC.z < textureLod(shadowMap, shadowTexCoord, 0).x + 0.001f) || outOfView) ? 1.0f : 0.0f;
+}
+
+
 vec4 getLight(vec3 lightPos, vec3 pos, vec3 normal, vec3 lightColor, vec3 surfaceColor, vec4 material)
 {
   const vec3 lightDir   = normalize(lightPos - pos);
   //const vec3 lightColor = texture(skybox, invview);
-  return vec4(pbr_light(surfaceColor, pos, normal, normalize(lightPos), material, lightColor), 1.f);
+  return vec4(pbr_light(surfaceColor, pos, normal, normalize(lightPos), material, lightColor, shadow(pos)), 1.f);
 //  return vec4(surfaceColor, 1) * 0.05;
 }
+
 
 void main(void)
 {
@@ -63,14 +82,14 @@ void main(void)
   
   const vec4 mat = texture(material, surf.texCoord);
   // Only sunlight. Other are in sphere_deferred;
-  const vec3 lightPos = (params.mView * vec4(-150, 100, -200, 1)).xyz;
+  const vec3 lightPos = (params.mView * vec4(params.position.xyz, 1)).xyz;
   const vec3 absPos = normalize(inverse(mat3(params.mView)) * pos);
   const vec3 reflection = texture(skybox, (absPos - 2 * absNormal * dot(absNormal, absPos))).rgb;
   //const vec3 reflection = texture(skybox, -absPos).rgb;
   if (params.pbr != 0) {
     out_fragColor = getLight(lightPos, pos, normal, reflection, surfaceColor, mat);
   } else {
-    out_fragColor.rgb = surfaceColor * max(0.05, dot(normalize(lightPos - pos), normal));
+    out_fragColor.rgb = surfaceColor * max(0.05, shadow(pos) * dot(normalize(lightPos - pos), normal));
   }
   gl_FragDepth = depthV;
 }

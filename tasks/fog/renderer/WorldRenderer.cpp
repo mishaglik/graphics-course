@@ -109,13 +109,40 @@ void WorldRenderer::update(const FramePacket& packet)
 {
   ZoneScoped;
 
+  if (shadowCamSync) {
+    auto& sun = sceneMgr->getLights()[LightSource::Id::Sun];
+    glm::vec3 target{16, 14, -64};
+    shadow.camera.lookAt(sun.position, target, {0, 1 ,0}); //TODO: sync with current view 
+    float length = glm::distance(shadow.camera.position, target) - glm::distance(target, packet.mainCam.position);
+    shadow.camera.move(shadow.camera.forward() * length);
+  }
   // calc camera matrix
   {
+    // const Camera& camera = shadow.camera;
+    const Camera& camera = packet.mainCam;
     const float aspect = float(resolution.x) / float(resolution.y);
-    renderContext.worldViewProj = packet.mainCam.projTm(aspect) * packet.mainCam.viewTm();
-    renderContext.worldView = packet.mainCam.viewTm();
-    renderContext.worldProj = packet.mainCam.projTm(aspect);
-    renderContext.camPos = packet.mainCam.position;
+    renderContext.worldViewProj = camera.projTm(aspect) * camera.viewTm();
+    renderContext.worldView = camera.viewTm();
+    renderContext.worldProj = camera.projTm(aspect);
+    renderContext.camPos = camera.position;
+  }
+
+
+  // calc light matrix
+  {
+    const auto mProj = shadow.usePerspectiveM
+      ? glm::perspectiveLH_ZO(
+          -glm::radians(shadow.camera.fov), 1.0f, 1.0f, shadow.lightTargetDist * 2.0f)
+      : glm::orthoLH_ZO(
+          +shadow.radius,
+          -shadow.radius,
+          +shadow.radius,
+          -shadow.radius,
+          0.0f,
+          shadow.lightTargetDist);
+
+    renderContext.lightViewProj = mProj * shadow.camera.viewTm();
+
   }
 
   if(!pause) {
@@ -148,7 +175,8 @@ void WorldRenderer::renderWorld(
         vk::ImageLayout::eDepthAttachmentOptimal, 
         vk::ImageAspectFlagBits::eDepth
       );
-    etna::flush_barriers(cmd_buf);
+
+    
     
     etna::RenderTargetState renderTargets({
       cmd_buf,
@@ -161,6 +189,45 @@ void WorldRenderer::renderWorld(
     terrainPipeline2.render(cmd_buf, gbuffer2, renderContext);
     if (enableStaticMesh)
       staticMeshPipeline2.render(cmd_buf, gbuffer2, renderContext);
+  }
+
+  if(enableShadow) {
+    etna::set_state(cmd_buf, 
+      gbuffer2.shadow().get(), 
+      vk::PipelineStageFlagBits2::eColorAttachmentOutput, 
+      vk::AccessFlagBits2::eColorAttachmentWrite | vk::AccessFlagBits2::eColorAttachmentRead,
+      vk::ImageLayout::eDepthAttachmentOptimal, 
+      vk::ImageAspectFlagBits::eDepth
+    );
+    etna::flush_barriers(cmd_buf);
+    etna::RenderTargetState renderTargets({
+      cmd_buf,
+      {{0, 0}, {gbuffer2.shadow().getResolution().x, gbuffer2.shadow().getResolution().y}},
+      gbuffer2.shadow().getColorAttachments(),
+      gbuffer2.shadow().getDepthAttachment(),
+      {}
+    });
+    staticMeshPipeline2.renderShadow(cmd_buf, renderContext);
+  } else {
+    etna::set_state(cmd_buf, 
+      gbuffer2.shadow().get(), 
+      vk::PipelineStageFlagBits2::eTransfer, 
+      vk::AccessFlagBits2::eTransferWrite,
+      vk::ImageLayout::eTransferDstOptimal, 
+      vk::ImageAspectFlagBits::eDepth
+    );
+    etna::flush_barriers(cmd_buf);
+    vk::ClearDepthStencilValue clear{1.f, 0};
+    std::array<vk::ImageSubresourceRange, 1> range{
+      vk::ImageSubresourceRange{
+        .aspectMask = vk::ImageAspectFlagBits::eDepth,
+        .baseMipLevel = 0,
+        .levelCount = 1,
+        .baseArrayLayer = 0,
+        .layerCount = 1,
+      }
+    };
+    cmd_buf.clearDepthStencilImage(gbuffer2.shadow().get(), vk::ImageLayout::eTransferDstOptimal, clear, range);
   }
 
   terrainTransparentPipeline2.prepare(cmd_buf, renderContext);
@@ -186,6 +253,13 @@ void WorldRenderer::renderWorld(
     }
     etna::set_state(cmd_buf, 
       gbuffer2.getDepthImage().get(), 
+      vk::PipelineStageFlagBits2::eFragmentShader, 
+      vk::AccessFlagBits2::eShaderSampledRead, 
+      vk::ImageLayout::eShaderReadOnlyOptimal, 
+      vk::ImageAspectFlagBits::eDepth
+    );
+    etna::set_state(cmd_buf, 
+      gbuffer2.shadow().get(), 
       vk::PipelineStageFlagBits2::eFragmentShader, 
       vk::AccessFlagBits2::eShaderSampledRead, 
       vk::ImageLayout::eShaderReadOnlyOptimal, 
@@ -321,6 +395,17 @@ WorldRenderer::drawGui()
 
     if(ImGui::TreeNode("Lightning settings"))
     {
+      ImGui::SeparatorText("Shadow camera");
+      {
+        ImGui::Checkbox("Enable shadows", &enableShadow);
+        ImGui::BeginDisabled(!enableShadow);
+        ImGui::Checkbox("Sync shadow cam", &shadowCamSync);
+        ImGui::SliderFloat("Radius", &shadow.radius, 0, 100);
+        ImGui::SliderFloat("LightTargetDist", &shadow.lightTargetDist, 0, 100);
+        ImGui::Checkbox("usePerspectiveM", &shadow.usePerspectiveM);
+        ImGui::EndDisabled();
+      }
+      ImGui::SeparatorText("Resolve G buffer");
       resolveGPipeline2.drawGui();
       ImGui::TreePop();
     }

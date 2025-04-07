@@ -124,7 +124,7 @@ void WorldRenderer::update(const FramePacket& packet)
     auto& sun = sceneMgr->getLights()[LightSource::Id::Sun];
     glm::vec3 target{16, 14, -64};
     shadow.camera.lookAt(sun.position, target, {0, 1 ,0}); //TODO: sync with current view 
-    shadow.lightTargetDist = 1.2 * glm::distance(shadow.camera.position, target);
+    shadow.lightTargetDist = 1.2f * glm::distance(shadow.camera.position, target);
   }
   // calc camera matrix
   {

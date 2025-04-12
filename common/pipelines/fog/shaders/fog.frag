@@ -15,7 +15,7 @@ layout(binding = 1) uniform sampler2D depth;
 layout(push_constant) uniform pc_t
 {
     mat4 mProj;
-    mat4 mView;
+    mat4 mIView;
     vec4 position;
     vec2 shift;
     float horizon;
@@ -25,21 +25,13 @@ layout(push_constant) uniform pc_t
     int steps;
 } params;
 
-const vec2 resolution = vec2(1280, 720);
-
+const vec2 resolution = vec2(1280 / 2, 720 / 2);
+#include "position.glsl"
 vec3 getPos(float depth, float wc) {
   if(depth == 1) {
-    return vec3(
-      (4 * gl_FragCoord.x / resolution.x) - 1,
-      (4 * gl_FragCoord.y / resolution.y) - 1,
-      params.horizon
-    );
+    return getScreenPos(depth, 1/params.horizon);
   }
-  return vec3(
-    (4 * gl_FragCoord.x / resolution.x) - 1,
-    (4 * gl_FragCoord.y / resolution.y) - 1,
-    depth
-  ) / wc;
+  return getScreenPos(depth, wc);
 }
 
 float rand(vec2 c){
@@ -113,8 +105,8 @@ void main() {
   const float depthV = texture(depth, surf.texCoord).r;
 
   const vec3 pos_screen = getPos(depthV, wc);
-  const vec3 camPos = (params.mView * vec4(0,0,0,1)).xyz;
-  const vec3 pos = (params.mView * vec4(inverse(mat3(params.mProj)) * (pos_screen + vec3(0, 0, 0.01)), 1)).xyz;
+  const vec3 camPos = getCamWorldPos(params.mIView);
+  const vec3 pos = getWorldPos(getCamPos(pos_screen, params.mProj), params.mIView);
 
   const vec3 lightPos = (vec4(params.position.xyz, 1)).xyz;
   out_fragColor.rgb = vec3(integrate_f(camPos, pos, params.steps, lightPos));

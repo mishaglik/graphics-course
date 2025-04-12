@@ -32,14 +32,8 @@ layout(push_constant) uniform pc_t
 #include "pbr.glsl"
 
 const vec2 resolution = vec2(1280, 720);
+#include "position.glsl"
 
-vec3 getPos(float depth, float wc) {
-  return vec3(
-    (2 * gl_FragCoord.x / resolution.x) - 1,
-    (2 * gl_FragCoord.y / resolution.y) - 1,
-    depth
-  ) / wc;
-}
 
 float shadow(vec3 pos) {
   pos = inverse(mat3(params.mView)) * (pos - (params.mView * vec4(0,0,0,1)).xyz);
@@ -60,7 +54,7 @@ vec4 getLight(vec3 lightPos, vec3 pos, vec3 normal, vec3 lightColor, vec3 surfac
 {
   const vec3 lightDir   = normalize(lightPos - pos);
   //const vec3 lightColor = texture(skybox, invview);
-  return vec4(pbr_light(surfaceColor, pos, normal, normalize(lightPos), material, lightColor, shadow(pos)), 1.f);
+  return vec4(pbr_light(surfaceColor, pos, normal, normalize(lightPos), material, lightColor, shadow(pos), params.mView), 1.f);
 //  return vec4(surfaceColor, 1) * 0.05;
 }
 
@@ -77,8 +71,8 @@ void main(void)
   normal = normalize(iv3 * normal);
   const float wc    = texture(wc, surf.texCoord).r;
   const float depthV = texture(depth, surf.texCoord).r;
-  const vec3 pos_screen = getPos(depthV, wc);
-  const vec3 pos = inverse(mat3(params.mProj)) * (pos_screen - vec3(0, 0, params.mProj[3][2]));
+  const vec3 pos_screen = getScreenPos(depthV, wc);
+  const vec3 pos = getCamPos(pos_screen, params.mProj);
   
   const vec4 mat = texture(material, surf.texCoord);
   // Only sunlight. Other are in sphere_deferred;

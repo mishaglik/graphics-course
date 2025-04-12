@@ -14,13 +14,13 @@
 namespace pipes {
 
 void 
-AAPipeline::allocate()
+BoilerplatePipeline::allocate()
 {
     // auto& ctx = etna::get_context();
 }
 
 void 
-AAPipeline::loadShaders() 
+BoilerplatePipeline::loadShaders() 
 {
     etna::create_program(
         "boilerplate_shader",
@@ -30,7 +30,7 @@ AAPipeline::loadShaders()
 }
 
 void 
-AAPipeline::setup() 
+BoilerplatePipeline::setup() 
 {
     auto& pipelineManager = etna::get_context().getPipelineManager();
 
@@ -46,20 +46,21 @@ AAPipeline::setup()
 }
 
 void 
-AAPipeline::drawGui()
+BoilerplatePipeline::drawGui()
 {
 
 }
 
 void 
-AAPipeline::debugInput(const Keyboard& /*kb*/)
+BoilerplatePipeline::debugInput(const Keyboard& /*kb*/)
 {
 
 }
 
 void
-AAPipeline::render(vk::CommandBuffer cmd_buf, const RenderContext& ctx)
+BoilerplatePipeline::render(vk::CommandBuffer cmd_buf, const RenderContext& ctx)
 {
+  pushConstants.mProjView = ctx.worldViewProj;
   ETNA_PROFILE_GPU(cmd_buf, pipelines_boilerplate_render);
   {
     auto boilerplateShader = etna::get_shader_program("boilerplate_shader");
@@ -86,8 +87,8 @@ AAPipeline::render(vk::CommandBuffer cmd_buf, const RenderContext& ctx)
       pipeline.getVkPipelineLayout(), 
       vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eVertex,
       0,
-      uint32_t(sizeof(ctx.worldViewProj)),
-      &ctx.worldViewProj
+      uint32_t(sizeof(PushConstants)),
+      &pushConstants
     );
 
     cmd_buf.draw(3, 1, 0, 0);

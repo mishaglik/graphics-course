@@ -57,20 +57,12 @@ vec3 hue(float x) {
 
 #include "pbr.glsl"
 
-const vec2 resolution = vec2(1280, 720);
-
-vec3 getPos(float depth, float wc) {
-  return vec3(
-    (2 * gl_FragCoord.x / resolution.x) - 1,
-    (2 * gl_FragCoord.y / resolution.y) - 1,
-    depth
-  ) / wc;
-}
 
 vec4 getLight(vec3 lightPos, vec3 pos, vec3 normal, vec3 lightColor, vec3 surfaceColor, vec4 material)
 {
   const vec3 lightDir   = normalize(lightPos - pos);
-  return vec4(pbr_light(surfaceColor, pos, normal, normalize(lightPos), material, lightColor), 1.f);
+  const mat4 mView = mat4(vec4(1, 0, 0, 0), vec4(0, 1, 0, 0), vec4(0, 0, 1, 0), vec4(0, 0, 0, 1));
+  return vec4(pbr_light(surfaceColor, pos, normal, normalize(lightPos), material, lightColor, 1.f, mView), 1.f);
 }
 
 vec3 pbrWater(vec3 surfaceColor)

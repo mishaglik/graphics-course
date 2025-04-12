@@ -8,7 +8,7 @@ target_include_directories(fog_pipeline INTERFACE shaders)
 target_shader_include_directories(fog_pipeline INTERFACE shaders)
 target_shader_include_directories(fog_pipeline PUBLIC ${PROJECT_SOURCE_DIR}/common/shaders)
 
-target_link_libraries(fog_pipeline PUBLIC etna targets gui PRIVATE scene)
+target_link_libraries(fog_pipeline PUBLIC etna targets gui PRIVATE scene render_utils)
 
 
 target_add_shaders(fog_pipeline

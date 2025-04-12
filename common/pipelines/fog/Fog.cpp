@@ -118,9 +118,6 @@ FogPipeline::debugInput(const Keyboard& /*kb*/)
 void
 FogPipeline::render(vk::CommandBuffer cmd_buf, const targets::GBuffer& gbuffer, const RenderContext& ctx)
 {
-  pushConstants.mProj     = ctx.worldProj;
-  pushConstants.mView     = ctx.worldIView;
-
   pushConstants.position  = ctx.sceneMgr->getLights()[LightSource::Id::Sun].position;
   pushConstants.shift += wind * ctx.dt;
   ETNA_PROFILE_GPU(cmd_buf, pipelines_fog_render);
@@ -135,6 +132,7 @@ FogPipeline::render(vk::CommandBuffer cmd_buf, const targets::GBuffer& gbuffer, 
       {
         etna::Binding{0, gbuffer.getImage(targets::GBuffer::ImageId::Wc).genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
         etna::Binding{1, gbuffer.getImage(4).genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+        etna::Binding{2, ctx.worldViewMatrices.genBinding()},
       }
     );
     

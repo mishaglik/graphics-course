@@ -104,24 +104,24 @@ StaticMeshPipeline::setup()
         },
     });
 
-    shadowPipeline = pipelineManager.createGraphicsPipeline(
-      "staticmesh_shadow",
-      etna::GraphicsPipeline::CreateInfo{
-        .vertexShaderInput = sceneVertexInputDesc,
-        .rasterizationConfig =
-          vk::PipelineRasterizationStateCreateInfo{
-            .polygonMode = vk::PolygonMode::eFill,
-            .cullMode = vk::CullModeFlagBits::eBack,
-            .frontFace = vk::FrontFace::eCounterClockwise,
-            .lineWidth = 1.f,
-          },
+    // shadowPipeline = pipelineManager.createGraphicsPipeline(
+    //   "staticmesh_shadow",
+    //   etna::GraphicsPipeline::CreateInfo{
+    //     .vertexShaderInput = sceneVertexInputDesc,
+    //     .rasterizationConfig =
+    //       vk::PipelineRasterizationStateCreateInfo{
+    //         .polygonMode = vk::PolygonMode::eFill,
+    //         .cullMode = vk::CullModeFlagBits::eBack,
+    //         .frontFace = vk::FrontFace::eCounterClockwise,
+    //         .lineWidth = 1.f,
+    //       },
         
-        .fragmentShaderOutput =
-          {
-            // .colorAttachmentFormats = RenderTarget::Shadow::COLOR_ATTACHMENT_FORMATS,
-            .depthAttachmentFormat = RenderTarget::Shadow::DEPTH_ATTACHMENT_FORMAT,
-          },
-      });
+    //     .fragmentShaderOutput =
+    //       {
+    //         // .colorAttachmentFormats = RenderTarget::Shadow::COLOR_ATTACHMENT_FORMATS,
+    //         .depthAttachmentFormat = RenderTarget::Shadow::DEPTH_ATTACHMENT_FORMAT,
+    //       },
+    //   });
 }
 
 void 
@@ -141,8 +141,8 @@ StaticMeshPipeline::debugInput(const Keyboard& kb)
   }
 }
 
-targets::GBuffer& 
-StaticMeshPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer& target, const RenderContext& ctx)
+void
+StaticMeshPipeline::render(vk::CommandBuffer cmd_buf,  const RenderContext& ctx)
 {
   
   // etna::RenderTargetState renderTargets(
@@ -155,7 +155,7 @@ StaticMeshPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer& target, 
 
   cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.getVkPipeline());
   if (!ctx.sceneMgr->getVertexBuffer())
-    return target;
+    return;
 
   prepareFrame(ctx);
 
@@ -165,7 +165,7 @@ StaticMeshPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer& target, 
   cmd_buf.bindIndexBuffer(ctx.sceneMgr->getIndexBuffer(), 0, vk::IndexType::eUint32);
 
 
-  pushConst2M.projView = ctx.worldViewProj;
+  pushConst2M.wId = ctx.worldId;
   auto set0 = etna::create_descriptor_set(
   staticMesh.getDescriptorLayoutId(0),
   cmd_buf,
@@ -195,6 +195,7 @@ StaticMeshPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer& target, 
           etna::Binding{0, baseColorImage        .genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
           etna::Binding{1, normalImage           .genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
           etna::Binding{2, metallicRoughnessImage.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+          etna::Binding{3, ctx.worldViewMatrices.genBinding()},
         });
       pushConst2M.color = material.baseColor;
       pushConst2M.emr_factors = material.EMR_Factor;
@@ -208,67 +209,6 @@ StaticMeshPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer& target, 
       const auto& relem = relems[j];
       cmd_buf.pushConstants<PushConstants>(
         pipeline.getVkPipelineLayout(), vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, {pushConst2M});
-      cmd_buf.drawIndexed(
-        relem.indexCount, static_cast<uint32_t>(nInstances[j]), relem.indexOffset, relem.vertexOffset, static_cast<uint32_t>(firstInstance));
-      firstInstance += nInstances[j];
-    }
-  }
-    return target;
-}
-
-void
-StaticMeshPipeline::renderShadow(vk::CommandBuffer cmd_buf, const RenderContext& ctx)
-{
-  
-  // etna::RenderTargetState renderTargets(
-  //   cmd_buf,
-  //   {{0, 0}, {ctx.resolution.x, ctx.resolution.y}},
-  //   gBufferColorAttachments,
-  //   gBufferDepthAttachment
-  // );
-    
-
-  cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, shadowPipeline.getVkPipeline());
-  if (!ctx.sceneMgr->getVertexBuffer())
-    return;
-
-  auto staticMesh = etna::get_shader_program("staticmesh_shadow");
-
-  cmd_buf.bindVertexBuffers(0, {ctx.sceneMgr->getVertexBuffer()}, {0});
-  cmd_buf.bindIndexBuffer(ctx.sceneMgr->getIndexBuffer(), 0, vk::IndexType::eUint32);
-
-
-  pushConst2M.projView = ctx.lightViewProj;
-  auto set0 = etna::create_descriptor_set(
-    staticMesh.getDescriptorLayoutId(0),
-    cmd_buf,
-    {
-      etna::Binding{0, instanceMatricesBuf.genBinding()},
-    }
-  );
-  auto relems = ctx.sceneMgr->getRenderElements();
-  std::size_t firstInstance = 0;
-  cmd_buf.pushConstants<PushConstants>(shadowPipeline.getVkPipelineLayout(), vk::ShaderStageFlagBits::eVertex, 0, {pushConst2M});
-  for (std::size_t j = 0; j < relems.size(); ++j)
-  {
-    //Skip drawing water as it is rendered by terrain
-    if (j == 8) {
-      firstInstance += nInstances[j];
-      continue;
-    }  
-    if (nInstances[j] != 0)
-    {
-      // pushConst2M.color = material.baseColor;
-      // pushConst2M.emr_factors = material.EMR_Factor;
-      cmd_buf.bindDescriptorSets(
-        vk::PipelineBindPoint::eGraphics,
-        shadowPipeline.getVkPipelineLayout(),
-        0,
-        {set0.getVkSet()},
-        {});
-
-      const auto& relem = relems[j];
-      
       cmd_buf.drawIndexed(
         relem.indexCount, static_cast<uint32_t>(nInstances[j]), relem.indexOffset, relem.vertexOffset, static_cast<uint32_t>(firstInstance));
       firstInstance += nInstances[j];
@@ -321,7 +261,7 @@ StaticMeshPipeline::prepareFrame(const RenderContext& ctx)
     for (std::size_t j = 0; j < meshes[meshIdx].relemCount; j++)
     {
       const auto relemIdx = meshes[meshIdx].firstRelem + j;
-      if (enableCulling && IsNotVisble(bbs[relemIdx], ctx.worldViewProj * instanceMatrix))
+      if (enableCulling && (ctx.worldId == 0) && IsNotVisble(bbs[relemIdx], ctx.worldViewProj * instanceMatrix))
       {
         continue;
       }

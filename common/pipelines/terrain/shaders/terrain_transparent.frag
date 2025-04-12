@@ -13,25 +13,12 @@ layout (location = 0) in VS_OUT
   float height;
 } surf;
 
-layout(push_constant) uniform params_t
-{
-  vec2 base; 
-  vec2 extent;
-  mat4 mProjView;
-  vec3 camPos;
-  int degree;
-  float seaLevel;
-  float maxHeight;
-  uint nChunks;
-  uint subChunk;
-  uint corner;
-  float time;
-} params;
 
 layout(set=0, binding = 0) uniform sampler2D hmap;
 layout(set=0, binding = 1) uniform sampler2D normalMap;
 layout(set=0, binding = 2) uniform sampler2D tprrMap;
-layout(set=0, binding = 3) uniform samplerCube skybox;
+
+layout(set=0, binding = 4) uniform samplerCube skybox;
 
 //TODO: Bindless
 layout(set=1, binding = 0) uniform sampler2D grasTexture;

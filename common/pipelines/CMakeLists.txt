@@ -11,6 +11,7 @@ add_subdirectory(tonemap)
 add_subdirectory(aa)
 add_subdirectory(water)
 add_subdirectory(fog)
+add_subdirectory(scene)
 
 add_library(pipelines INTERFACE)
 
@@ -21,6 +22,7 @@ target_link_libraries(pipelines INTERFACE
     resolvegbuffer_pipeline
     tonemap_pipeline
     aa_pipeline
+    scene_pipeline
     water_pipeline
     fog_pipeline
 )
@@ -35,4 +37,5 @@ add_custom_target(pipeline_shaders DEPENDS
     aa_pipeline_shaders
     water_pipeline_shaders
     fog_pipeline_shaders
+    # scene_pipeline_shaders
 )

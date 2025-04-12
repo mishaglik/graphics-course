@@ -41,6 +41,17 @@ private:
   etna::GraphicsPipeline spherePipeline{};
   etna::Sampler defaultSampler;
 
+  struct PushConstants {
+    glm::vec4 pos, color; 
+    int pbr;
+  } pushConstants; 
+
+  struct PushConstantsSphere{
+    glm::vec4 pos, color; 
+    float degree; 
+    int pbr;
+  } pushConstantsSphere;
+
   bool usePbr = true;
   bool secondaryLight        = false;
   bool secondaryLightSources = false;

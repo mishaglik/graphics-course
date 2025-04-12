@@ -32,21 +32,20 @@ public:
     void debugInput(const Keyboard& /*kb*/);
 
     void prepare(vk::CommandBuffer cmd_buf, const RenderContext& context) { regenerateTerrainIfNeeded(cmd_buf, {context.camPos.x, context.camPos.z}, context.sceneMgr->terrain()); }
-    RenderTarget& render (vk::CommandBuffer cmd_buf, RenderTarget& target, const RenderContext& context);
+    void render (vk::CommandBuffer cmd_buf, const RenderContext& context);
 
 private: 
     
     void regenerateTerrainIfNeeded(vk::CommandBuffer cmd_buf, glm::vec2 pos, scene::TerrainManager& mgr);
     
-    void drawChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& cur_chunk, uint8_t chunk_mask = 0xF);
-    void drawSubChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& glob_chunk, glm::uvec2 index, uint8_t chunk_mask = 0xF);
+    void drawChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& cur_chunk, const RenderContext& ctx, uint8_t chunk_mask = 0xF);
+    void drawSubChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& glob_chunk, const RenderContext& ctx, glm::uvec2 index, uint8_t chunk_mask = 0xF);
 
 
 private:
 
     struct PushConstants {
         glm::vec2 base, extent;
-        glm::mat4x4 mat; 
         glm::vec3 camPos;
         int degree;
         float seaLevel = 14.f;
@@ -54,6 +53,7 @@ private:
         glm::uint nHalfChunks  = 0;
         glm::uint subChunk = 0;
         glm::uint corner = 0;
+        glm::uint worldId; 
         float time;
     } pushConstants;
 

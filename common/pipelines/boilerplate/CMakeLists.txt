@@ -6,6 +6,7 @@ target_include_directories(boilerplate_pipeline PUBLIC ../..)
 target_include_directories(boilerplate_pipeline INTERFACE shaders)
 # Allow GLSL code to include helper files and compat
 target_shader_include_directories(boilerplate_pipeline INTERFACE shaders)
+target_shader_include_directories(boilerplate_pipeline PUBLIC ${PROJECT_SOURCE_DIR}/common/shaders)
 
 target_link_libraries(boilerplate_pipeline PUBLIC etna targets gui PRIVATE scene)
 

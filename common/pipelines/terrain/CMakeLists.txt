@@ -7,8 +7,9 @@ target_include_directories(terrain_pipeline INTERFACE shaders)
 # Allow GLSL code to include helper files and compat
 target_shader_include_directories(terrain_pipeline INTERFACE shaders)
 target_shader_include_directories(terrain_pipeline PUBLIC ${PROJECT_SOURCE_DIR}/common/shaders)
+target_shader_include_directories(terrain_pipeline PUBLIC ${PROJECT_SOURCE_DIR}/common/render_utils/shaders)
 
-target_link_libraries(terrain_pipeline PUBLIC etna targets gui PRIVATE scene perlin_pipeline)
+target_link_libraries(terrain_pipeline PUBLIC etna targets gui PRIVATE scene render_utils perlin_pipeline)
 
 
 target_add_shaders(terrain_pipeline

@@ -185,7 +185,8 @@ ResolveGBufferPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer& sour
         etna::Binding{3, source.getImage(3).genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
         etna::Binding{4, source.getImage(4).genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
         etna::Binding{5, skybox.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal, {.layerCount=6, .type=vk::ImageViewType::eCube})},
-        etna::Binding{6, source.shadow().genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)}
+        etna::Binding{6, source.getImage(4).genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+        etna::Binding{7, ctx.worldViewMatrices.genBinding()}
 
       }
     );
@@ -198,13 +199,15 @@ ResolveGBufferPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer& sour
       {}
     );
 
-    struct {glm::mat4x4 p, v, l; glm::vec4 pos, color; int pbr;} pushConstants{ctx.worldProj, ctx.worldView, ctx.lightViewProj, ctx.sceneMgr->getLights()[LightSource::Id::Sun].position, ctx.sceneMgr->getLights()[LightSource::Id::Sun].colorRange, usePbr ? 1 : 0};
+    pushConstants.pos = ctx.sceneMgr->getLights()[LightSource::Id::Sun].position;
+    pushConstants.color = ctx.sceneMgr->getLights()[LightSource::Id::Sun].colorRange;
+    pushConstants.pbr = usePbr ? 1 : 0;
 
     cmd_buf.pushConstants(
       pipeline.getVkPipelineLayout(), 
       vk::ShaderStageFlagBits::eFragment,
       0,
-      uint32_t(sizeof(pushConstants)),
+      uint32_t(sizeof(PushConstants)),
       &pushConstants
     );
 
@@ -254,15 +257,19 @@ void ResolveGBufferPipeline::renderSphereDeferred(vk::CommandBuffer cmd_buf, tar
       continue;
     }
     n = std::min(n, 128u);
-    struct {glm::mat4x4 pv, v, l; glm::vec4 pos, color; float degree; int pbr;} pushConstants{ctx.worldProj, ctx.worldView, {}, light.position, light.colorRange, M_PIf / n, usePbr ? 1 : 0};
+    pushConstantsSphere.pos   = light.position;
+    pushConstantsSphere.color = light.colorRange;
+    pushConstantsSphere.degree = M_PIf / n;
+    pushConstantsSphere.pbr = usePbr ? 1 : 0;
+
     pushConstants.pos += light.floatingAmplitude * glm::sin(light.floatingSpeed * static_cast<float>(ctx.frameTime));
     pushConstants.pos.w = light.position.w;
     cmd_buf.pushConstants(
       pipeline.getVkPipelineLayout(), 
       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
       0,
-      uint32_t(sizeof(pushConstants)),
-      &pushConstants
+      uint32_t(sizeof(PushConstantsSphere)),
+      &pushConstantsSphere
     );
 
     cmd_buf.draw(2 * n + 2, n, 0, 0);
@@ -283,15 +290,18 @@ void ResolveGBufferPipeline::renderSphere(vk::CommandBuffer cmd_buf, const Rende
     if (n == 0) continue;
     n = std::min(n, 128u);
     n = std::max(n,   5u);
-    struct {glm::mat4x4 pv, v, l; glm::vec4 pos, color; float degree;} pushConstants{ctx.worldProj, ctx.worldView, {}, light.position, light.colorRange, M_PIf / n};
-    pushConstants.pos.w = light.visibleRadius;
-    pushConstants.pos += light.floatingAmplitude * glm::sin(light.floatingSpeed * static_cast<float>(ctx.frameTime));
+    pushConstantsSphere.pos   = light.position;
+    pushConstantsSphere.color = light.colorRange;
+    pushConstantsSphere.degree = M_PIf / n;
+
+    pushConstantsSphere.pos.w = light.visibleRadius;
+    pushConstantsSphere.pos += light.floatingAmplitude * glm::sin(light.floatingSpeed * static_cast<float>(ctx.frameTime));
     cmd_buf.pushConstants(
       pipeline.getVkPipelineLayout(), 
       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
       0,
-      uint32_t(sizeof(pushConstants)),
-      &pushConstants
+      uint32_t(sizeof(PushConstantsSphere)),
+      &pushConstantsSphere
     );
 
     cmd_buf.draw(2 * n + 2, n, 0, 0);

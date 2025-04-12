@@ -151,11 +151,11 @@ TerrainPipeline::debugInput(const Keyboard& kb)
     }
 }
 
-targets::GBuffer& 
-TerrainPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer& target, const RenderContext& ctx)
+void
+TerrainPipeline::render(vk::CommandBuffer cmd_buf, const RenderContext& ctx)
 {
   ETNA_PROFILE_GPU(cmd_buf, renderTerrain);
-  pushConstants.mat  = ctx.worldViewProj;
+  pushConstants.worldId = ctx.worldId;
   pushConstants.camPos  = ctx.camPos;
   pushConstants.seaLevel = ctx.sceneMgr->terrain().seaLevel();
   pushConstants.maxHeight = ctx.sceneMgr->terrain().maxHeight();
@@ -192,12 +192,11 @@ TerrainPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer& target, con
           mask = 0xF;
         }
         // drawChunk(cmd_buf, chunk, mask);
-        drawSubChunk(cmd_buf, level.chunk, {dx, dy}, mask);
+        drawSubChunk(cmd_buf, level.chunk, ctx, {dx, dy},  mask);
       }
     } 
   }
 
-  return target;
 }
 
 void 
@@ -293,7 +292,7 @@ TerrainPipeline::regenerateTerrainIfNeeded(vk::CommandBuffer cmd_buf, glm::vec2 
 }
 
 void 
-TerrainPipeline::drawChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& cur_chunk, uint8_t chunk_mask)
+TerrainPipeline::drawChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& cur_chunk, const RenderContext& ctx, uint8_t chunk_mask)
 {
   auto terrainShader = etna::get_shader_program("terrain_shader");
 
@@ -303,7 +302,8 @@ TerrainPipeline::drawChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& cur
     {
       etna::Binding{0, cur_chunk.getImage(0).genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
       etna::Binding{1, cur_chunk.getImage(1).genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
-      etna::Binding{2, cur_chunk.getImage(2).genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)}
+      etna::Binding{2, cur_chunk.getImage(2).genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+      etna::Binding{3, ctx.worldViewMatrices.genBinding()},
     }
   );
 
@@ -347,7 +347,7 @@ TerrainPipeline::drawChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& cur
 }
 
 void 
-TerrainPipeline::drawSubChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& glob_chunk, glm::uvec2 index, uint8_t chunk_mask)
+TerrainPipeline::drawSubChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& glob_chunk, const RenderContext& ctx, glm::uvec2 index, uint8_t chunk_mask)
 {
   auto terrainShader = etna::get_shader_program("terrain_shader");
 
@@ -357,7 +357,8 @@ TerrainPipeline::drawSubChunk(vk::CommandBuffer cmd_buf, targets::TerrainChunk& 
     {
       etna::Binding{0, glob_chunk.getImage(0).genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
       etna::Binding{1, glob_chunk.getImage(1).genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
-      etna::Binding{2, glob_chunk.getImage(2).genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)}
+      etna::Binding{2, glob_chunk.getImage(2).genBinding(tilingSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+      etna::Binding{3, ctx.worldViewMatrices.genBinding()},
     }
   );
 

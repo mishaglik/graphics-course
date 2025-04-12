@@ -40,6 +40,8 @@ public:
   void renderWorld(
     vk::CommandBuffer cmd_buf, vk::Image target_image, vk::ImageView target_image_view);
 
+  void renderShadow(vk::CommandBuffer cmd_buf);
+
   void renderPostprocess(
     vk::CommandBuffer cmd_buf, vk::Image target_image, vk::ImageView target_image_view);
 private:
@@ -55,16 +57,19 @@ private:
   void prepareFrame(const glm::mat4x4& glob_tm);
 
   void regenTerrain();
+  void updateShadow();
+  void updateRenderCtxt();
 public:
 
-  private:
+private:
   std::unique_ptr<SceneManager> sceneMgr;
 
   etna::Buffer constants;
+
   
-  pipes::TerrainPipeline    terrainPipeline2{};
+  
+  pipes::ScenePipeline    scenePipeline2{};
   pipes::TerrainTransparentPipeline terrainTransparentPipeline2{};
-  pipes::StaticMeshPipeline staticMeshPipeline2{};
   
   pipes::SkyboxPipeline         skyboxPipeline2{};
   pipes::FogPipeline            fogPipeline2 {};
@@ -78,6 +83,9 @@ public:
   targets::Backbuffer backbuffer2{};
   targets::FogBuffer fogbuffer2{};
   targets::GBuffer gbuffer2{};
+
+  targets::GBuffer shadowGBuffer2{};
+
 
   etna::Sampler defaultSampler;
   glm::uvec2 resolution;
@@ -101,7 +109,10 @@ public:
 
   bool pause = false;
 
-  bool enableStaticMesh = true;
   bool enableShadow = true;
-  bool shadowCamSync = true;
+  uint32_t shadowCascades = 1;
+  float zMult = 10.0f;
+
+  bool shadowUpdateEnabled = true;
+  
 };

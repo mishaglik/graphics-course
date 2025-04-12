@@ -10,7 +10,6 @@ layout(push_constant) uniform params_t
 {
   vec2 base; 
   vec2 extent;
-  mat4 mProjView;
   vec3 camPos;
   int degree;
   float seaLevel;
@@ -18,6 +17,7 @@ layout(push_constant) uniform params_t
   uint nChunks;
   uint subChunk;
   uint corner;
+  uint wId;
   float time;
 } params;
 

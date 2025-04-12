@@ -2,6 +2,8 @@
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_GOOGLE_include_directive : require
 
+#include "projview.hpp"
+
 layout (location = 0 ) in VS_OUT
 {
   vec2 texCoord;
@@ -11,11 +13,12 @@ layout(location = 0) out vec4 out_fragColor;
 
 layout(binding = 0) uniform sampler2D    wc;
 layout(binding = 1) uniform sampler2D depth;
+layout(binding = 2) uniform WVPM_t {
+  WorldViewProjMatrices world;
+};
 
 layout(push_constant) uniform pc_t
 {
-    mat4 mProj;
-    mat4 mIView;
     vec4 position;
     vec2 shift;
     float horizon;
@@ -105,8 +108,8 @@ void main() {
   const float depthV = texture(depth, surf.texCoord).r;
 
   const vec3 pos_screen = getPos(depthV, wc);
-  const vec3 camPos = getCamWorldPos(params.mIView);
-  const vec3 pos = getWorldPos(getCamPos(pos_screen, params.mProj), params.mIView);
+  const vec3 camPos = getCamWorldPos(world.mIView);
+  const vec3 pos = getWorldPos(getCamPos(pos_screen, world.mProj), world.mIView);
 
   const vec3 lightPos = (vec4(params.position.xyz, 1)).xyz;
   out_fragColor.rgb = vec3(integrate_f(camPos, pos, params.steps, lightPos));

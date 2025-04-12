@@ -6,6 +6,7 @@ layout(location = 0) out vec4 out_fragColor;
 layout(location = 1) out vec4 out_fragNormal;
 layout(location = 2) out vec4 out_fragMaterial;
 layout(location = 3) out float out_fragWc;
+#include "projview.hpp"
 
 layout (location = 0) in VS_OUT
 {
@@ -19,7 +20,6 @@ layout(push_constant) uniform params_t
 {
   vec2 base; 
   vec2 extent;
-  mat4 mProjView;
   vec3 camPos;
   int degree;
   float seaLevel;
@@ -27,12 +27,16 @@ layout(push_constant) uniform params_t
   uint nChunks;
   uint subChunk;
   uint corner;
+  uint wId;
   float time;
 } params;
 
 layout(set=0, binding = 0) uniform sampler2D hmap;
 layout(set=0, binding = 1) uniform sampler2D normalMap;
 layout(set=0, binding = 2) uniform sampler2D tprrMap;
+layout(set=0, binding = 3) uniform WVPM_t {
+  WorldViewProjMatrices world;
+};
 
 //TODO: Bindless
 layout(set=1, binding = 0) uniform sampler2D grasTexture;

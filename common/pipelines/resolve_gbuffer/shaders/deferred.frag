@@ -2,6 +2,7 @@
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_GOOGLE_include_directive : require
 
+#include "projview.hpp"
 
 layout(location = 0) out vec4 out_fragColor;
 
@@ -19,14 +20,15 @@ layout(binding = 5) uniform samplerCube skybox;
 
 layout(binding = 6) uniform sampler2D shadowMap;
 
+layout(binding = 7) uniform WVPM_t {
+  WorldViewProjMatrices world;
+};
+
 layout(push_constant) uniform pc_t
 {
-    mat4 mProj;
-    mat4 mView;
-    mat4 lightMatrix;
-    vec4 position;
-    vec4 color;
-    int pbr;
+  vec4 position;
+  vec4 color;
+  int pbr;
 } params;
 
 #include "pbr.glsl"
@@ -36,7 +38,9 @@ const vec2 resolution = vec2(1280, 720);
 
 
 float shadow(vec3 pos) {
-  pos = inverse(mat3(params.mView)) * (pos - (params.mView * vec4(0,0,0,1)).xyz);
+  return 1.f;
+  /*
+  pos = inverse(mat3(world.mView)) * (pos - (world.mView * vec4(0,0,0,1)).xyz);
   const vec4 posLightClipSpace = params.lightMatrix*vec4(pos, 1.0f);
 
   const vec3 posLightSpaceNDC = posLightClipSpace.xyz/posLightClipSpace.w;
@@ -47,6 +51,7 @@ float shadow(vec3 pos) {
   if(outOfView)
     out_fragColor.r = 1;
   return ((posLightSpaceNDC.z < textureLod(shadowMap, shadowTexCoord, 0).x + 0.001f) || outOfView) ? 1.0f : 0.0f;
+  */
 }
 
 
@@ -54,7 +59,7 @@ vec4 getLight(vec3 lightPos, vec3 pos, vec3 normal, vec3 lightColor, vec3 surfac
 {
   const vec3 lightDir   = normalize(lightPos - pos);
   //const vec3 lightColor = texture(skybox, invview);
-  return vec4(pbr_light(surfaceColor, pos, normal, normalize(lightPos), material, lightColor, shadow(pos), params.mView), 1.f);
+  return vec4(pbr_light(surfaceColor, pos, normal, normalize(lightPos), material, lightColor, shadow(pos), world.mView), 1.f);
 //  return vec4(surfaceColor, 1) * 0.05;
 }
 
@@ -63,7 +68,7 @@ void main(void)
 {
   const vec3 surfaceColor = texture(albedo, surf.texCoord).rgb;
   const vec4 normal_wc = texture(normal, surf.texCoord);
-  const mat3 iv3 = transpose(inverse(mat3(params.mView)));
+  const mat3 iv3 = transpose(inverse(mat3(world.mView)));
   vec3 normal = normal_wc.xyz;
   if(length(normal) < 0.5)
     normal = vec3(0, 1, 0);
@@ -72,12 +77,12 @@ void main(void)
   const float wc    = texture(wc, surf.texCoord).r;
   const float depthV = texture(depth, surf.texCoord).r;
   const vec3 pos_screen = getScreenPos(depthV, wc);
-  const vec3 pos = getCamPos(pos_screen, params.mProj);
+  const vec3 pos = getCamPos(pos_screen, world.mProj);
   
   const vec4 mat = texture(material, surf.texCoord);
   // Only sunlight. Other are in sphere_deferred;
-  const vec3 lightPos = (params.mView * vec4(params.position.xyz, 1)).xyz;
-  const vec3 absPos = normalize(inverse(mat3(params.mView)) * pos);
+  const vec3 lightPos = (world.mView * vec4(params.position.xyz, 1)).xyz;
+  const vec3 absPos = normalize(inverse(mat3(world.mView)) * pos);
   const vec3 reflection = texture(skybox, (absPos - 2 * absNormal * dot(absNormal, absPos))).rgb;
   //const vec3 reflection = texture(skybox, -absPos).rgb;
   if (params.pbr != 0) {

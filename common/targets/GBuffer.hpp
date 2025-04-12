@@ -9,7 +9,6 @@ namespace targets {
 
 class GBuffer {
 public:
-    using Shadow = ShadowMap;
     static const std::vector<vk::Format> COLOR_ATTACHMENT_FORMATS;// = {vk::Format::eB10G11R11UfloatPack32};
     static const vk::Format              DEPTH_ATTACHMENT_FORMAT  = vk::Format::eD32Sfloat;
     static const constexpr int N_COLOR_ATTACHMENTS = 4;
@@ -17,18 +16,20 @@ public:
     const std::vector<etna::RenderTargetState::AttachmentParams>& getColorAttachments() { return color_attachments; }
     etna::RenderTargetState::AttachmentParams getDepthAttachment() { return depth_attachment; }
     
-    glm::uvec2 getResolution();
+    glm::uvec2 getResolution() { return resolution; }
 
     etna::Image& getImage(std::size_t i);
     const etna::Image& getImage(std::size_t i) const;
+
     etna::Image& getDepthImage() { return depth_buffer; }
     const etna::Image& getDepthImage() const { return depth_buffer; }
+    
+    void allocate(glm::uvec2 extent, uint32_t layers = 1);
+    
+    void setActiveLayer(uint32_t layer);
 
-    
-    
-    ShadowMap& shadow() {return shadowMap; }
-    
-    void allocate(glm::uvec2 extent);
+    void toRenderTarget(vk::CommandBuffer cmd_buf);
+    void toSampler(vk::CommandBuffer cmd_buf);
     
     enum class ImageId {
         Albedo   = 0,
@@ -46,7 +47,6 @@ private:
     
     etna::Image depth_buffer;
     glm::uvec2 resolution;
-    ShadowMap shadowMap;
 };
 
 }

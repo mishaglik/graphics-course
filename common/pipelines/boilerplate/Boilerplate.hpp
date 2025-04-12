@@ -12,12 +12,12 @@
 
 namespace pipes {
 
-class AAPipeline {
+class BoilerplatePipeline {
 public:
     using RenderTarget = targets::Backbuffer;
     static_assert(RenderTarget::N_COLOR_ATTACHMENTS == 1, "Boilerplate renders into single layer");
 
-    AAPipeline() {}
+    BoilerplatePipeline() {}
     
     void allocate();
     
@@ -34,7 +34,11 @@ private:
     
 private:
     etna::GraphicsPipeline pipeline;
+    
+    struct PushConstants {
+        glm::mat4x4 mProjView;
+    } pushConstants;
 };
 
 }
-static_assert(Pipeline<pipes::AAPipeline>, "Boilerplate must be valid pipeline");
+static_assert(Pipeline<pipes::BoilerplatePipeline>, "Boilerplate must be valid pipeline");

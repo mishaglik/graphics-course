@@ -2,6 +2,8 @@
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_GOOGLE_include_directive : require
 
+#include "projview.hpp"
+
 layout(location = 0) out vec4 out_fragColor;
 layout(location = 1) out vec4 out_fragNormal;
 layout(location = 2) out vec4 out_fragMaterial;
@@ -22,15 +24,18 @@ layout (std140, set = 0, binding = 0) readonly buffer ims_t {
 layout(set = 1, binding = 0) uniform sampler2D baseColorTexture;
 layout(set = 1, binding = 1) uniform sampler2D    normalTexture;
 layout(set = 1, binding = 2) uniform sampler2D      emr_Texture;
+layout(set = 1, binding = 3) uniform WVPM_t {
+  WorldViewProjMatrices world;
+};
 
 layout(push_constant) uniform params_t
 {
-  mat4 mProjView;
   mat4 mModel;
   vec4 color;
   vec4 emr_;
   vec3 pos;
   uint relemIdx;
+  uint wId;
 } params;
 
 

@@ -8,7 +8,7 @@ target_include_directories(boilerplate_pipeline INTERFACE shaders)
 target_shader_include_directories(boilerplate_pipeline INTERFACE shaders)
 target_shader_include_directories(boilerplate_pipeline PUBLIC ${PROJECT_SOURCE_DIR}/common/shaders)
 
-target_link_libraries(boilerplate_pipeline PUBLIC etna targets gui PRIVATE scene)
+target_link_libraries(boilerplate_pipeline PUBLIC etna targets gui PRIVATE scene render_utils)
 
 
 target_add_shaders(boilerplate_pipeline

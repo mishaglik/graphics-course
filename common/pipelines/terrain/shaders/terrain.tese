@@ -1,12 +1,13 @@
 #version 450 core
+#extension GL_GOOGLE_include_directive : require
 
 layout (quads, fractional_odd_spacing, ccw) in;
+#include "projview.hpp"
 
 layout(push_constant) uniform params_t
 {
   vec2 base; 
   vec2 extent;
-  mat4 mProjView;
   vec3 camPos;
   int degree;
   float seaLevel;
@@ -14,12 +15,16 @@ layout(push_constant) uniform params_t
   uint nChunks;
   uint subChunk;
   uint corner;
+  uint wId;
   float time;
 } params;
 
 layout(binding = 0) uniform sampler2D heightMap;
 layout(binding = 1) uniform sampler2D normalMap;
 layout(binding = 2) uniform sampler2D tprrMap;
+layout(set=0, binding = 3) uniform WVPM_t {
+  WorldViewProjMatrices world;
+};
 
 layout(location = 0) in vec2 TextureCoord[];
 
@@ -79,5 +84,5 @@ void main()
     surf.normal = -normal;
     surf.worldCoord = p.xz;
     
-    gl_Position = params.mProjView * vec4(p.xyz, 1);
+    gl_Position = world.mProjView[params.wId] * vec4(p.xyz, 1);
 }

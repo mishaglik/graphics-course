@@ -40,8 +40,6 @@ private:
     etna::GraphicsPipeline pipelineResolve;
 
     struct PushConstants {
-        glm::mat4 mProj;
-        glm::mat4 mView;
         glm::vec4 position;
         glm::vec2 shift;
         float horizon = 100;

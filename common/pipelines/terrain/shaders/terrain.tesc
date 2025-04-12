@@ -1,16 +1,17 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
 
 layout (vertices=4) out;
 
 layout(location = 0) in vec2 TexCoord[];
 
 layout(location = 0) out vec2 TextureCoord[];
+#include "projview.hpp"
 
 layout(push_constant) uniform params_t
 {
   vec2 base; 
   vec2 extent;
-  mat4 mProjView;
   vec3 camPos;
   int degree;
   float seaLevel;
@@ -18,6 +19,7 @@ layout(push_constant) uniform params_t
   uint nChunks;
   uint subChunk;
   uint corner;
+  uint wId;
   float time;
 } params;
 

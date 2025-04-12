@@ -3,6 +3,8 @@
 #extension GL_GOOGLE_include_directive : require
 layout(location = 0) out vec4 out_fragColor;
 
+#include "projview.hpp"
+
 layout (location = 0 ) in VS_OUT
 {
   vec3 lightDir;
@@ -15,15 +17,17 @@ layout(binding = 2) uniform sampler2D material;
 layout(binding = 3) uniform sampler2D wc;
 layout(binding = 4) uniform sampler2D depth;
 
+layout(binding = 5) uniform WVPM_t {
+  WorldViewProjMatrices world;
+};
+
+
 layout(push_constant) uniform pc_t
 {
-    mat4 mProj;
-    mat4 mView;
-    mat4 lightMatrix;
-    vec4 pos;
-    vec4 color;
-    float degree;
-    int pbr;
+  vec4 pos;
+  vec4 color;
+  float degree;
+  int pbr;
 } params;
 #include "pbr.glsl"
 
@@ -34,7 +38,7 @@ vec4 getLight(vec3 pos, vec3 normal, vec3 lightColor, vec3 lightDir, vec3 surfac
 {
   if(dot(normal, normalize(-lightDir)) < 0)
     return vec4(0);
-  return vec4(lightColor * pbr_light(surfaceColor, pos, normal, normalize(-lightDir), material, vec3(1, 1, 1), 1.f, params.mView), 1.f);
+  return vec4(lightColor * pbr_light(surfaceColor, pos, normal, normalize(-lightDir), material, vec3(1, 1, 1), 1.f, world.mView), 1.f);
 }
 
 void main(void)
@@ -44,7 +48,7 @@ void main(void)
   const vec3 surfaceColor = texture(albedo, texCoord).rgb;
 
   const vec4 normal_wc = texture(normal, texCoord);
-  const mat3 ipv3 = transpose(inverse(mat3(params.mView)));
+  const mat3 ipv3 = transpose(inverse(mat3(world.mView)));
 
   vec3 normal = normal_wc.xyz;
   if(length(normal) < 0.5)
@@ -54,9 +58,9 @@ void main(void)
   const float wc     = texture(wc,    texCoord).r;
   const float depthV = texture(depth, texCoord).w;
   const vec3 pos_screen = getScreenPos(depthV, wc);
-  const vec3 pos = getCamPos(pos_screen, params.mProj);
+  const vec3 pos = getCamPos(pos_screen, world.mProj);
   
-  const vec3 lightDir = pos - (params.mView * vec4(params.pos.xyz, 1)).xyz;
+  const vec3 lightDir = pos - (world.mView * vec4(params.pos.xyz, 1)).xyz;
   const float dist = length(transpose(ipv3) * lightDir);
   if (dist < params.pos.w) {
       if (params.pbr != 0) {

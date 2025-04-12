@@ -7,8 +7,9 @@ target_include_directories(resolvegbuffer_pipeline INTERFACE shaders)
 # Allow GLSL code to include helper files and compat
 target_shader_include_directories(resolvegbuffer_pipeline INTERFACE shaders)
 target_shader_include_directories(resolvegbuffer_pipeline PUBLIC "${PROJECT_SOURCE_DIR}/common/shaders")
+target_shader_include_directories(resolvegbuffer_pipeline PUBLIC "${PROJECT_SOURCE_DIR}/common/render_utils/shaders")
 
-target_link_libraries(resolvegbuffer_pipeline PUBLIC etna targets gui PRIVATE scene)
+target_link_libraries(resolvegbuffer_pipeline PUBLIC etna targets gui PRIVATE scene render_utils)
 
 
 target_add_shaders(resolvegbuffer_pipeline

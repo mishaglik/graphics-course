@@ -34,9 +34,7 @@ public:
 
     void reserve(std::size_t n) { nInstances.assign(n, 0); }
 
-    RenderTarget& render(vk::CommandBuffer cmd_buf, RenderTarget& target, const RenderContext& context);
-
-    void renderShadow(vk::CommandBuffer cmd_buf, const RenderContext& context);
+    void render(vk::CommandBuffer cmd_buf, const RenderContext& context);
 
 private: 
 
@@ -50,11 +48,11 @@ private:
     etna::Sampler defaultSampler;
     struct PushConstants
     {
-        glm::mat4x4 projView;
         glm::mat4x4 model;
         glm::vec4 color, emr_factors;
         glm::vec3 pos{16, 14, -64};
         glm::uint  instIdx;
+        glm::uint wId;
     } pushConst2M;
 
     std::vector<std::size_t> nInstances;

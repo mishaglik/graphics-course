@@ -3,6 +3,7 @@
 #extension GL_GOOGLE_include_directive : require
 
 #include "unpack_attributes.glsl"
+#include "projview.hpp"
 
 
 layout(location = 0) in vec4 vPosNorm;
@@ -11,12 +12,12 @@ layout(location = 2) in vec4 vNormTexCoord;
 
 layout(push_constant) uniform params_t
 {
-  mat4 mProjView;
   mat4 mModel;
   vec4 color;
   vec4 emr_;
   vec3 startPos;
   uint relemIdx;
+  uint wId;
 } params;
 
 
@@ -32,6 +33,10 @@ layout (location = 0 ) out VS_OUT
 layout (std140, set = 0, binding = 0) readonly buffer ims_t {
   mat4 mModels[]; 
 } ims;
+
+layout(set = 1, binding = 3) uniform WVPM_t {
+  WorldViewProjMatrices world;
+};
 
 out gl_PerVertex { vec4 gl_Position; };
 
@@ -50,5 +55,5 @@ void main(void)
   vOut.texCoord = vTexCoordAndTang.xy;
   vOut.normTexCoord = vNormTexCoord.xy;
 
-  gl_Position   = params.mProjView * vec4(vOut.wPos, 1.0);
+  gl_Position   = world.mProjView[params.wId] * vec4(vOut.wPos, 1.0);
 }

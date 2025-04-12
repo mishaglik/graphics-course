@@ -36,13 +36,12 @@ public:
 
 private: 
     
-    void drawSubChunk(vk::CommandBuffer cmd_buf, targets::WaterChunk& water, targets::TerrainChunk& glob_chunk, glm::uvec2 index, const etna::Image& skybox, uint8_t chunk_mask = 0xF);
+    void drawSubChunk(vk::CommandBuffer cmd_buf, targets::WaterChunk& water, targets::TerrainChunk& glob_chunk, glm::uvec2 index, const RenderContext& ctx, uint8_t chunk_mask = 0xF);
 
 private:
 
     struct PushConstants {
         glm::vec2 base, extent;
-        glm::mat4x4 mat; 
         glm::vec3 camPos;
         int degree;
         float seaLevel = 14.f;
@@ -50,6 +49,7 @@ private:
         glm::uint nHalfChunks  = 0;
         glm::uint subChunk = 0;
         glm::uint corner = 0;
+        glm::uint wId = 0; 
         float time;
     } pushConstants;
 

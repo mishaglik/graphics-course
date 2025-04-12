@@ -1,4 +1,5 @@
 #include "GBuffer.hpp"
+#include "etna/Etna.hpp"
 #include <etna/GlobalContext.hpp>
 
 namespace targets {
@@ -11,7 +12,7 @@ const std::vector<vk::Format> GBuffer::COLOR_ATTACHMENT_FORMATS = {
 };
 
 void
-GBuffer::allocate(glm::uvec2 extent)
+GBuffer::allocate(glm::uvec2 extent, uint32_t layers)
 {
   std::array<const char*, N_COLOR_ATTACHMENTS> names = {
     "gbuffer_albedo",
@@ -30,6 +31,7 @@ GBuffer::allocate(glm::uvec2 extent)
       .name = names[i],
       .format = COLOR_ATTACHMENT_FORMATS[i],
       .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+      .layers = layers,
     });
   }
 
@@ -38,6 +40,7 @@ GBuffer::allocate(glm::uvec2 extent)
     .name = "gBuffer_depth",
     .format = vk::Format::eD32Sfloat,
     .imageUsage = vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled,
+    .layers = layers,
   });
 
   color_attachments.resize(N_COLOR_ATTACHMENTS);
@@ -45,19 +48,69 @@ GBuffer::allocate(glm::uvec2 extent)
   for(std::size_t i = 0; i < N_COLOR_ATTACHMENTS; ++i) {
     color_attachments[i] = etna::RenderTargetState::AttachmentParams {
       .image = color_buffer[i].get(),
-      .view  = color_buffer[i].getView({}),
+      .view  = color_buffer[i].getView({.layerCount=1}),
       .imageAspect = vk::ImageAspectFlagBits::eColor,
     };
   }
 
   depth_attachment = etna::RenderTargetState::AttachmentParams {
     .image = depth.get(),
-    .view  = depth.getView({}),
+    .view  = depth.getView({.layerCount=1}),
     .imageAspect = vk::ImageAspectFlagBits::eDepth,
   };
-  
-  shadowMap.allocate({2048, 2048});
 }
+
+void 
+GBuffer::setActiveLayer(uint32_t layer)
+{
+  for(std::size_t i = 0; i < N_COLOR_ATTACHMENTS; ++i) {
+    color_attachments[i].view = color_buffer[i].getView({.baseLayer=layer, .layerCount=1});
+  }
+  depth_attachment.view = depth_buffer.getView({.baseLayer=layer, .layerCount=1});
+}
+
+void
+GBuffer::toRenderTarget(vk::CommandBuffer cmd_buf)
+{
+  for(std::size_t i = 0; i < targets::GBuffer::N_COLOR_ATTACHMENTS; i++) {
+    etna::set_state(cmd_buf, 
+      color_buffer[i].get(), 
+      vk::PipelineStageFlagBits2::eColorAttachmentOutput, 
+      vk::AccessFlagBits2::eColorAttachmentWrite,
+      vk::ImageLayout::eColorAttachmentOptimal, 
+      vk::ImageAspectFlagBits::eColor
+    );
+  }
+  etna::set_state(cmd_buf, 
+      depth_buffer.get(), 
+      vk::PipelineStageFlagBits2::eColorAttachmentOutput, 
+      vk::AccessFlagBits2::eColorAttachmentWrite,
+      vk::ImageLayout::eDepthAttachmentOptimal, 
+      vk::ImageAspectFlagBits::eDepth
+  );
+}
+
+void
+GBuffer::toSampler(vk::CommandBuffer cmd_buf)
+{
+  for(std::size_t i = 0; i < targets::GBuffer::N_COLOR_ATTACHMENTS; i++) {
+    etna::set_state(cmd_buf, 
+      color_buffer[i].get(), 
+      vk::PipelineStageFlagBits2::eFragmentShader, 
+      vk::AccessFlagBits2::eShaderSampledRead,
+      vk::ImageLayout::eShaderReadOnlyOptimal, 
+      vk::ImageAspectFlagBits::eColor
+    );
+  }
+  etna::set_state(cmd_buf, 
+      depth_buffer.get(), 
+      vk::PipelineStageFlagBits2::eFragmentShader, 
+      vk::AccessFlagBits2::eShaderSampledRead,
+      vk::ImageLayout::eShaderReadOnlyOptimal, 
+      vk::ImageAspectFlagBits::eDepth
+  );
+}
+
 
 etna::Image&
 GBuffer::getImage(std::size_t i)

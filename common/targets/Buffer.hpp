@@ -25,7 +25,7 @@ public:
     
         color_buffer = ctx.createImage(etna::Image::CreateInfo{
             .extent = vk::Extent3D{resolution.x, resolution.y, 1},
-        #if defined(__PRETTY_FUNCTION__)
+        #if defined (__GNUG__)
             .name = __PRETTY_FUNCTION__,
         #else
             .name = "targets::Buffer",
@@ -109,6 +109,6 @@ private:
 template<vk::Format FORMAT, vk::ImageUsageFlagBits... flags>
 const std::vector<vk::Format> BufferDepth<FORMAT, flags...>::COLOR_ATTACHMENT_FORMATS = {};
 
-using ShadowMap = BufferDepth<vk::Format::eD16Unorm, vk::ImageUsageFlagBits::eSampled, vk::ImageUsageFlagBits::eTransferDst>;
+using SimpleShadowMap = BufferDepth<vk::Format::eD16Unorm, vk::ImageUsageFlagBits::eSampled, vk::ImageUsageFlagBits::eTransferDst>;
 
 }

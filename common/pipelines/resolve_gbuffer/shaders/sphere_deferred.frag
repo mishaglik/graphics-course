@@ -28,20 +28,13 @@ layout(push_constant) uniform pc_t
 #include "pbr.glsl"
 
 const vec2 resolution = vec2(1280, 720);
-
-vec3 getPos(float depth, float wc) {
-  return vec3(
-    (2 * gl_FragCoord.x / resolution.x) - 1,
-    (2 * gl_FragCoord.y / resolution.y) - 1,
-    depth
-  ) / wc;
-}
+#include "position.glsl"
 
 vec4 getLight(vec3 pos, vec3 normal, vec3 lightColor, vec3 lightDir, vec3 surfaceColor, vec4 material)
 {
   if(dot(normal, normalize(-lightDir)) < 0)
     return vec4(0);
-  return vec4(lightColor * pbr_light(surfaceColor, pos, normal, normalize(-lightDir), material, vec3(1, 1, 1), 1.f), 1.f);
+  return vec4(lightColor * pbr_light(surfaceColor, pos, normal, normalize(-lightDir), material, vec3(1, 1, 1), 1.f, params.mView), 1.f);
 }
 
 void main(void)
@@ -60,8 +53,8 @@ void main(void)
   
   const float wc     = texture(wc,    texCoord).r;
   const float depthV = texture(depth, texCoord).w;
-  const vec3 pos_screen = getPos(depthV, wc);
-  const vec3 pos = inverse(mat3(params.mProj)) * pos_screen;
+  const vec3 pos_screen = getScreenPos(depthV, wc);
+  const vec3 pos = getCamPos(pos_screen, params.mProj);
   
   const vec3 lightDir = pos - (params.mView * vec4(params.pos.xyz, 1)).xyz;
   const float dist = length(transpose(ipv3) * lightDir);

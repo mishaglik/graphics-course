@@ -184,8 +184,8 @@ WorldRenderer::updateShadow() {
     glm::mat4x4 mProj = glm::perspectiveLH_ZO(
       -glm::radians(60.f),
       float(resolution.x) / resolution.y,
-      zCorner(0, i, shadowCascades, 0.01, zFar, zDivide),
-      zCorner(1, i, shadowCascades, 0.01, zFar, zDivide)
+      zCorner(0, i, shadowCascades, 0.01f, zFar, zDivide),
+      zCorner(1, i, shadowCascades, 0.01f, zFar, zDivide)
     );
     const auto inv = renderContext.worldIView * glm::inverse(mProj);
     
@@ -244,7 +244,7 @@ WorldRenderer::updateShadow() {
         maxZ = std::max(maxZ, trf.z);
       }
       
-      float lightDist = - minZ + 0.01;
+      float lightDist = - minZ + 0.01f;
       shadowCamera.move(lightDir * lightDist);
       lightView = shadowCamera.viewTm();
       lightProj = glm::orthoLH_ZO(minX, maxX, minY, maxY, 0.01f, maxZ+lightDist);

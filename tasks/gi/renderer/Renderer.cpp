@@ -57,11 +57,12 @@ void Renderer::initFrameDelivery(vk::UniqueSurfaceKHR a_surface, ResolutionProvi
 
   worldRenderer = std::make_unique<WorldRenderer>();
 
+  guiRenderer = std::make_unique<ImGuiRenderer>(window->getCurrentFormat());
+  
   worldRenderer->loadShaders();
   worldRenderer->allocateResources(resolution);
   worldRenderer->setupPipelines(window->getCurrentFormat());
 
-  guiRenderer = std::make_unique<ImGuiRenderer>(window->getCurrentFormat());
 }
 
 void Renderer::loadScene(std::filesystem::path path)

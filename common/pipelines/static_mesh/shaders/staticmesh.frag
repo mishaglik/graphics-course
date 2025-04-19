@@ -55,8 +55,10 @@ void main()
   vec3 bitangent = normalize(cross(surf.wNorm.xyz, surf.wTangent.xyz));
   vec4 normalMap = texture(normalTexture, surf.texCoord); 
   normalMap = 2 * normalMap - 1;
-  out_fragNormal.xyz = normalize(surf.wNorm.xyz * normalMap.b + surf.wTangent.xyz * normalMap.g + bitangent * normalMap.r);
-  //out_fragNormal = normalMap;
+  vec4 wNormal = vec4(normalize(surf.wNorm.xyz * normalMap.b + surf.wTangent.xyz * normalMap.g + bitangent * normalMap.r), 0);
+
+  out_fragNormal = vec4(normalize(transpose(mat3(world.mIView[0])) * wNormal.xyz), 0);
+
   out_fragWc = gl_FragCoord.w;
-  out_fragMaterial = params.emr_ * texture(emr_Texture, surf.normTexCoord);
+  out_fragMaterial = params.emr_ ;//* texture(emr_Texture, surf.normTexCoord);
 }

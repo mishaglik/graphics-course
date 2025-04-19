@@ -108,8 +108,8 @@ void main() {
   const float depthV = texture(depth, surf.texCoord).r;
 
   const vec3 pos_screen = getPos(depthV, wc);
-  const vec3 camPos = getCamWorldPos(world.mIView);
-  const vec3 pos = getWorldPos(getCamPos(pos_screen, world.mProj), world.mIView);
+  const vec3 camPos = getCamWorldPos(world.mIView[0]);
+  const vec3 pos = getWorldPos(getCamPos(pos_screen, world.mProj[0]), world.mIView[0]);
 
   const vec3 lightPos = (vec4(params.position.xyz, 1)).xyz;
   out_fragColor.rgb = vec3(integrate_f(camPos, pos, params.steps, lightPos));

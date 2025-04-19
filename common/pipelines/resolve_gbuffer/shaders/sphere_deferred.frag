@@ -29,7 +29,10 @@ layout(push_constant) uniform pc_t
   float degree;
   int pbr;
 } params;
+
+float shadow(vec3) { return 1; }
 #include "pbr.glsl"
+
 
 const vec2 resolution = vec2(1280, 720);
 #include "position.glsl"
@@ -38,7 +41,7 @@ vec4 getLight(vec3 pos, vec3 normal, vec3 lightColor, vec3 lightDir, vec3 surfac
 {
   if(dot(normal, normalize(-lightDir)) < 0)
     return vec4(0);
-  return vec4(lightColor * pbr_light(surfaceColor, pos, normal, normalize(-lightDir), material, vec3(1, 1, 1), 1.f, world.mView), 1.f);
+  return vec4(lightColor * pbr_light(surfaceColor, pos, normal, normalize(-lightDir), material, vec3(1, 1, 1), 1.f, world.mView[0]), 1.f);
 }
 
 void main(void)
@@ -48,7 +51,7 @@ void main(void)
   const vec3 surfaceColor = texture(albedo, texCoord).rgb;
 
   const vec4 normal_wc = texture(normal, texCoord);
-  const mat3 ipv3 = transpose(inverse(mat3(world.mView)));
+  const mat3 ipv3 = transpose(inverse(mat3(world.mView[0])));
 
   vec3 normal = normal_wc.xyz;
   if(length(normal) < 0.5)
@@ -58,12 +61,12 @@ void main(void)
   const float wc     = texture(wc,    texCoord).r;
   const float depthV = texture(depth, texCoord).w;
   const vec3 pos_screen = getScreenPos(depthV, wc);
-  const vec3 pos = getCamPos(pos_screen, world.mProj);
+  const vec3 pos = getCamPos(pos_screen, world.mProj[0]);
   
-  const vec3 lightDir = pos - (world.mView * vec4(params.pos.xyz, 1)).xyz;
+  const vec3 lightDir = pos - (world.mView[0] * vec4(params.pos.xyz, 1)).xyz;
   const float dist = length(transpose(ipv3) * lightDir);
   if (dist < params.pos.w) {
-      if (params.pbr != 0) {
+    if (params.pbr != 0) {
       out_fragColor.rgb = getLight(pos, normal, params.color.rgb, lightDir, surfaceColor, texture(material, texCoord)).rgb;
     } else {
       out_fragColor.rgb = surfaceColor * max(0., dot(-lightDir, normal)) * params.color.rgb;

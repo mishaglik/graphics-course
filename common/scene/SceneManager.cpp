@@ -617,6 +617,7 @@ static glm::vec4 randomColor() {
 void SceneManager::setupLights()
 {
 
+  // lightSources.add(/* 0*/  {{10, 10, 0,  0.f}, glm::vec4(0.6, 0.6, 0.6, 1.), 0.f});
   lightSources.add(/* 0*/  {{-150, 100, -200,  0.f}, glm::vec4(0.6, 0.6, 0.6, 1.), 0.f});
 #if 0
   const float lampRange = 2.5f;
@@ -668,6 +669,7 @@ std::vector<Material::Id> SceneManager::processMaterials(const tinygltf::Model& 
   materialMapping.reserve(model.materials.size());
   for(auto material : model.materials) {
     Material m;
+    bool hasBaseColor = false;
     if (material.pbrMetallicRoughness.baseColorFactor.size() == 4) {
       m.baseColor = glm::vec4{
         material.pbrMetallicRoughness.baseColorFactor[0],
@@ -675,6 +677,7 @@ std::vector<Material::Id> SceneManager::processMaterials(const tinygltf::Model& 
         material.pbrMetallicRoughness.baseColorFactor[2],
         material.pbrMetallicRoughness.baseColorFactor[3]
       };
+      hasBaseColor = true;
     } else {
       m.baseColor = glm::vec4(1.f, 1.f, 1.f, 1.f);
     }
@@ -685,13 +688,13 @@ std::vector<Material::Id> SceneManager::processMaterials(const tinygltf::Model& 
     if (material.pbrMetallicRoughness.baseColorTexture.index != -1) {
       m.baseColorTexture = texture_mapping[material.pbrMetallicRoughness.baseColorTexture.index];
     } else {
-      m.baseColorTexture = m_resources.primitiveTexture(0);
+      m.baseColorTexture = hasBaseColor ? m_resources.primitiveTexture(0xF) : Texture::Id::Undefined;
     }
 
     if (material.pbrMetallicRoughness.metallicRoughnessTexture.index != -1) {
       m.metallicRoughnessTexture = texture_mapping[material.pbrMetallicRoughness.metallicRoughnessTexture.index];
     } else {
-      m.metallicRoughnessTexture = m_resources.primitiveTexture(0);
+      m.metallicRoughnessTexture = m_resources.primitiveTexture(0xF);
     }
 
     if (material.normalTexture.index != -1) {

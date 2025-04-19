@@ -29,6 +29,7 @@ public:
   void update(const FramePacket& packet);
   void drawFrame();
 
+  std::unique_ptr<WorldRenderer> worldRenderer;
 private:
   ResolutionProvider resolutionProvider;
 
@@ -40,6 +41,5 @@ private:
   glm::mat4x4 mat, mat2;
   bool useVsync = true;
 
-  std::unique_ptr<WorldRenderer> worldRenderer;
   std::unique_ptr<ImGuiRenderer> guiRenderer;
 };

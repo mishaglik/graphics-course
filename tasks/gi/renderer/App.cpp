@@ -66,6 +66,9 @@ void App::processInput(float dt)
   if (mainWindow->captureMouse)
     rotateCam(mainCam, mainWindow->mouse, dt);
 
+  if(mainWindow->keyboard[KeyboardKey::kF5] == ButtonState::Falling) {
+    mainCam.lookAt(renderer->worldRenderer->curCamPos, renderer->worldRenderer->curCamTo, {0, 1, 0});
+  }
   if(mainWindow->keyboard[KeyboardKey::kP] == ButtonState::Falling)
     spdlog::info("Current position: {{{}, {}, {}}}", mainCam.position.x, mainCam.position.y, mainCam.position.z);
 

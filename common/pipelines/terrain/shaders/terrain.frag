@@ -102,7 +102,9 @@ void main(void)
   out_fragColor.rgb = heightColor(texture(tprrMap, surf.texCoord).r);
   // out_fragColor.rgb = surf.normal.rgb;
   // out_fragColor.g = 0;
-  out_fragNormal = vec4(surf.normal.rgb, 0);
+  const vec3 wNormal = surf.normal.xyz;
+  out_fragNormal = vec4(normalize(transpose(mat3(world.mIView[0])) * wNormal.xyz), 0);
+
   out_fragWc = gl_FragCoord.w;
   out_fragMaterial  = heightMaterial(surf.height);
 }

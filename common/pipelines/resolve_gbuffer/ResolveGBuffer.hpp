@@ -20,7 +20,7 @@ public:
 
     ResolveGBufferPipeline() {}
     
-    void allocate();
+    void allocate(glm::uvec2 resolution);
     
     void loadShaders();
 
@@ -30,20 +30,26 @@ public:
     
     void debugInput(const Keyboard& /*kb*/);
 
-    void render(vk::CommandBuffer cmd_buf, targets::GBuffer& source, const RenderContext& context);
+    void prepare(vk::CommandBuffer cmd_buf, targets::GBuffer& source, targets::GBuffer& shadow, uint32_t shadow_cascades, const RenderContext& context);
+    void render (vk::CommandBuffer cmd_buf, targets::GBuffer& source, targets::GBuffer& shadow, uint32_t shadow_cascades, const RenderContext& context);
 private: 
     void renderLights(vk::CommandBuffer cmd_buf);
     void renderSphereDeferred(vk::CommandBuffer cmd_buf, targets::GBuffer& source, const RenderContext& ctx);
     void renderSphere        (vk::CommandBuffer cmd_buf, const RenderContext& ctx);
 private:
+  etna::GraphicsPipeline diffuseLightPipeline{};
   etna::GraphicsPipeline deferredLightPipeline{};
   etna::GraphicsPipeline sphereDeferredPipeline{};
   etna::GraphicsPipeline spherePipeline{};
   etna::Sampler defaultSampler;
+  etna::Buffer samplingPoints;
+
+  targets::Buffer<vk::Format::eR8G8B8A8Snorm, vk::ImageUsageFlagBits::eSampled> diffuse;
 
   struct PushConstants {
     glm::vec4 pos, color; 
     int pbr;
+    int gi;
   } pushConstants; 
 
   struct PushConstantsSphere{
@@ -57,7 +63,8 @@ private:
   bool secondaryLightSources = false;
 
   bool normalAsAlbedo = false;
+  bool globalIllumination = true;
 };
 
 }
-static_assert(Pipeline<pipes::ResolveGBufferPipeline>, "ResolveGBuffer must be valid pipeline");
+// static_assert(Pipeline<pipes::ResolveGBufferPipeline>, "ResolveGBuffer must be valid pipeline");

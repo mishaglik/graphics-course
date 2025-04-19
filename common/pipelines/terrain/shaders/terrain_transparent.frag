@@ -41,7 +41,7 @@ vec3 hue(float x) {
     );
   
 }
-
+float shadow(vec3) { return 1; }
 #include "pbr.glsl"
 
 

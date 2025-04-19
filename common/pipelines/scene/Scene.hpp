@@ -11,6 +11,7 @@
 
 #include "pipelines/static_mesh/StaticMesh.hpp"
 #include "pipelines/terrain/Terrain.hpp"
+#include "pipelines/box/Box.hpp"
 
 
 namespace pipes {
@@ -34,7 +35,7 @@ public:
 
     void prepare(vk::CommandBuffer cmd_buf, const RenderContext& context);
 
-    void render(vk::CommandBuffer cmd_buf, const RenderContext& context);
+    void render(vk::CommandBuffer cmd_buf, RenderContext& context);
 
     void loadScene(SceneManager& scene_mgr);
 private: 
@@ -43,9 +44,18 @@ private:
     
     StaticMeshPipeline staticMeshPipeline;
     TerrainPipeline    terrainPipeline;
+    BoxPipeline        boxPipeline;
 
     bool enableStaticMesh = true;
     bool enableTerrain    = true;
+    bool enableBox        = false;
+
+    bool showSunPov = false;
+    bool sunWireframe = true;
+    bool showUserPov = true;
+    bool userWireframe = true;
+    bool boxSelfRender = false;
+
 
 };
 

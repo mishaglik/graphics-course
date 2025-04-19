@@ -15,6 +15,7 @@ target_link_libraries(resolvegbuffer_pipeline PUBLIC etna targets gui PRIVATE sc
 target_add_shaders(resolvegbuffer_pipeline
   shaders/deferred.vert
   shaders/deferred.frag
+  shaders/diffuse.frag
   shaders/sphere.vert
   shaders/sphere.frag
   shaders/sphere_deferred.frag

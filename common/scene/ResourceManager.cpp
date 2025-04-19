@@ -74,6 +74,11 @@ ResourceManager::primitiveTexture(uint8_t rgba)
 Texture::Id 
 ResourceManager::loadFromFile(std::filesystem::path filepath)
 {
+  #if 0
+    if(m_textures.size() > 0) {
+      return Texture::Id::Undefined;
+    }
+  #endif
     auto& ctx = etna::get_context();
     int width, height, nChans;
     auto uri = filepath.filename().generic_string<char>();

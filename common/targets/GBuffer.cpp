@@ -39,7 +39,7 @@ GBuffer::allocate(glm::uvec2 extent, uint32_t layers)
     .extent = vk::Extent3D{resolution.x, resolution.y, 1},
     .name = "gBuffer_depth",
     .format = vk::Format::eD32Sfloat,
-    .imageUsage = vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled,
+    .imageUsage = vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
     .layers = layers,
   });
 

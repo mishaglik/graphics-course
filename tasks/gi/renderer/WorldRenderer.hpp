@@ -44,6 +44,8 @@ public:
 
   void renderPostprocess(
     vk::CommandBuffer cmd_buf, vk::Image target_image, vk::ImageView target_image_view);
+  glm::vec3 curCamPos;
+  glm::vec3 curCamTo;
 private:
   void renderScene(
     vk::CommandBuffer cmd_buf, const glm::mat4x4& glob_tm, vk::PipelineLayout pipeline_layout);
@@ -86,21 +88,12 @@ private:
 
   targets::GBuffer shadowGBuffer2{};
 
+  std::array<VkDescriptorSet, N_MAX_SHADOW_LAYERS> tex;
 
   etna::Sampler defaultSampler;
   glm::uvec2 resolution;
 
   etna::Image skybox;
-  
-  
-  struct ShadowMapCam
-  {
-    Camera camera;
-    float radius = 10;
-    float lightTargetDist = 24;
-    bool usePerspectiveM = false;
-  } shadow;
-
 
   struct RenderGroup {
     RenderElement re;
@@ -110,9 +103,14 @@ private:
   bool pause = false;
 
   bool enableShadow = true;
-  uint32_t shadowCascades = 1;
-  float zMult = 10.0f;
+  uint32_t shadowCascades = 5;
+
+  float zDivide = 0.1f;
+
+  float zFar = 400.0f;
+  float imageSize = 0.25f;
 
   bool shadowUpdateEnabled = true;
+
   
 };

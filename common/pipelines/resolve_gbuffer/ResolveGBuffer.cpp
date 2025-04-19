@@ -16,10 +16,30 @@
 #endif
 namespace pipes {
 
+
+float rand_float() {
+  return float(rand()) / float(RAND_MAX);
+}
+
 void 
-ResolveGBufferPipeline::allocate()
+ResolveGBufferPipeline::allocate(glm::uvec2 resolution)
 {
-    // auto& ctx = etna::get_context();
+    auto& ctx = etna::get_context();
+    samplingPoints = ctx.createBuffer({
+      .size = 400 * sizeof(glm::vec4),
+      .bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer,
+      .memoryUsage = VMA_MEMORY_USAGE_CPU_TO_GPU,
+      .name = "Sampling points",
+    });
+    samplingPoints.map();
+    auto* points = reinterpret_cast<glm::vec4*>(samplingPoints.data());
+    
+    for(size_t i = 0; i < 400; i++) {
+      float r = rand_float();
+      float a = rand_float();
+      points[i] = glm::vec4((r - 0.5) * cos(2 * M_PIf * a), (r - 0.5) * sin(2 * M_PIf * a), 0, 0); 
+    }
+    diffuse.allocate({resolution.x / 2, resolution.y / 2});
 }
 
 void 
@@ -29,6 +49,11 @@ ResolveGBufferPipeline::loadShaders()
     "deferred_shader",
     {RESOLVEGBUFFER_PIPELINE_SHADERS_ROOT "deferred.vert.spv",
      RESOLVEGBUFFER_PIPELINE_SHADERS_ROOT "deferred.frag.spv"}
+  );
+  etna::create_program(
+    "diffuse_shader",
+    {RESOLVEGBUFFER_PIPELINE_SHADERS_ROOT "deferred.vert.spv",
+     RESOLVEGBUFFER_PIPELINE_SHADERS_ROOT "diffuse.frag.spv"}
   );
   etna::create_program(
     "sphere_deferred_shader",
@@ -67,6 +92,15 @@ ResolveGBufferPipeline::setup()
       .depthAttachmentFormat = RenderTarget::DEPTH_ATTACHMENT_FORMAT,
     },
   });
+
+  diffuseLightPipeline = pipelineManager.createGraphicsPipeline(
+    "diffuse_shader",
+    etna::GraphicsPipeline::CreateInfo{
+      .fragmentShaderOutput = {
+        .colorAttachmentFormats = decltype(diffuse)::COLOR_ATTACHMENT_FORMATS,
+        .depthAttachmentFormat  = decltype(diffuse)::DEPTH_ATTACHMENT_FORMAT,
+      },
+    });
 
   spherePipeline = pipelineManager.createGraphicsPipeline(
   "sphere_shader",
@@ -151,6 +185,9 @@ void
 ResolveGBufferPipeline::drawGui()
 {
   ImGui::Checkbox("Use pbr", &usePbr);
+  if(ImGui::Checkbox("Use gi", &globalIllumination)) {
+    pushConstants.gi = globalIllumination ? 1 : 0;
+  }
   ImGui::Checkbox("Enable secondary lighting", &secondaryLight);
   ImGui::Checkbox("Enable secondary lighting sources", &secondaryLightSources);
 
@@ -164,7 +201,90 @@ ResolveGBufferPipeline::debugInput(const Keyboard& /*kb*/)
 }
 
 void
-ResolveGBufferPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer& source, const RenderContext& ctx)
+ResolveGBufferPipeline::prepare(vk::CommandBuffer cmd_buf, targets::GBuffer& source, targets::GBuffer& shadow, uint32_t shadow_cascades, const RenderContext& ctx)
+{
+  etna::set_state(
+    cmd_buf, 
+    diffuse.get(), 
+    vk::PipelineStageFlagBits2::eColorAttachmentOutput, 
+    vk::AccessFlagBits2::eColorAttachmentWrite, 
+    vk::ImageLayout::eColorAttachmentOptimal, 
+    vk::ImageAspectFlagBits::eColor
+  );
+  etna::flush_barriers(cmd_buf);
+  auto& skybox = ctx.sceneMgr->resources()[ctx.sceneMgr->skybox()].image;
+
+  ETNA_PROFILE_GPU(cmd_buf, pipelines_diffuse_render);
+  {
+    etna::RenderTargetState renderTarget({
+      cmd_buf,
+      {{0, 0}, {diffuse.getResolution().x, diffuse.getResolution().y}},
+      diffuse.getColorAttachments(),
+      diffuse.getDepthAttachment(),
+      {}
+    });
+    auto diffuseLightShader = etna::get_shader_program("diffuse_shader");
+    auto& pipeline = diffuseLightPipeline;
+
+    cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.getVkPipeline());
+
+    auto set = etna::create_descriptor_set(
+      diffuseLightShader.getDescriptorLayoutId(0),
+      cmd_buf,
+      {
+        etna::Binding{0, source.getImage(0).genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+        etna::Binding{1, source.getImage(1).genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+        etna::Binding{2, source.getImage(2).genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+        etna::Binding{3, source.getImage(3).genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+        etna::Binding{4, source.getImage(4).genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+        
+        etna::Binding{5, shadow.getImage(0).genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal, {.layerCount=shadow_cascades, .type=vk::ImageViewType::e2DArray})},
+        etna::Binding{6, shadow.getImage(1).genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal, {.layerCount=shadow_cascades, .type=vk::ImageViewType::e2DArray})},
+        etna::Binding{7, shadow.getImage(2).genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal, {.layerCount=shadow_cascades, .type=vk::ImageViewType::e2DArray})},
+        etna::Binding{8, shadow.getImage(3).genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal, {.layerCount=shadow_cascades, .type=vk::ImageViewType::e2DArray})},
+        etna::Binding{9, shadow.getImage(4).genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal, {.layerCount=shadow_cascades, .type=vk::ImageViewType::e2DArray})},
+
+        etna::Binding{10, skybox.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal, {.layerCount=6, .type=vk::ImageViewType::eCube})},
+        etna::Binding{11, ctx.worldViewMatrices.genBinding()},
+        etna::Binding{12, samplingPoints.genBinding()}
+      }
+    );
+    
+    cmd_buf.bindDescriptorSets(
+      vk::PipelineBindPoint::eGraphics,
+      pipeline.getVkPipelineLayout(),
+      0,
+      {set.getVkSet()},
+      {}
+    );
+
+    pushConstants.pos = ctx.sceneMgr->getLights()[LightSource::Id::Sun].position;
+    pushConstants.color = ctx.sceneMgr->getLights()[LightSource::Id::Sun].colorRange;
+    pushConstants.pbr = usePbr ? 1 : 0;
+
+    cmd_buf.pushConstants(
+      pipeline.getVkPipelineLayout(), 
+      vk::ShaderStageFlagBits::eFragment,
+      0,
+      uint32_t(sizeof(PushConstants)),
+      &pushConstants
+    );
+
+    cmd_buf.draw(3, 1, 0, 0);
+  }
+
+  etna::set_state(
+    cmd_buf, 
+    diffuse.get(), 
+    vk::PipelineStageFlagBits2::eFragmentShader, 
+    vk::AccessFlagBits2::eShaderSampledRead, 
+    vk::ImageLayout::eShaderReadOnlyOptimal, 
+    vk::ImageAspectFlagBits::eColor
+  );
+}
+
+void
+ResolveGBufferPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer& source, targets::GBuffer& shadow, uint32_t shadow_cascades, const RenderContext& ctx)
 {
   auto& skybox = ctx.sceneMgr->resources()[ctx.sceneMgr->skybox()].image;
 
@@ -184,9 +304,16 @@ ResolveGBufferPipeline::render(vk::CommandBuffer cmd_buf, targets::GBuffer& sour
         etna::Binding{2, source.getImage(2).genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
         etna::Binding{3, source.getImage(3).genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
         etna::Binding{4, source.getImage(4).genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
-        etna::Binding{5, skybox.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal, {.layerCount=6, .type=vk::ImageViewType::eCube})},
-        etna::Binding{6, source.getImage(4).genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
-        etna::Binding{7, ctx.worldViewMatrices.genBinding()}
+        
+        etna::Binding{5, shadow.getImage(0).genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal, {.layerCount=shadow_cascades, .type=vk::ImageViewType::e2DArray})},
+        etna::Binding{6, shadow.getImage(1).genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal, {.layerCount=shadow_cascades, .type=vk::ImageViewType::e2DArray})},
+        etna::Binding{7, shadow.getImage(2).genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal, {.layerCount=shadow_cascades, .type=vk::ImageViewType::e2DArray})},
+        etna::Binding{8, shadow.getImage(3).genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal, {.layerCount=shadow_cascades, .type=vk::ImageViewType::e2DArray})},
+        etna::Binding{9, shadow.getImage(4).genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal, {.layerCount=shadow_cascades, .type=vk::ImageViewType::e2DArray})},
+
+        etna::Binding{10, skybox.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal, {.layerCount=6, .type=vk::ImageViewType::eCube})},
+        etna::Binding{11, ctx.worldViewMatrices.genBinding()},
+        etna::Binding{12, diffuse.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)}
 
       }
     );

@@ -131,8 +131,8 @@ void WorldRenderer::update(const FramePacket& packet) {
     camera.zFar = zFar;
     const float aspect = float(resolution.x) / float(resolution.y);
     renderContext.worldViewProj = camera.projTm(aspect) * camera.viewTm();
-    renderContext.worldView  = camera.viewTm();
     renderContext.worldIView = camera.viewItm();
+    renderContext.worldView  = camera.viewTm();
     renderContext.worldProj  = camera.projTm(aspect);
 
     renderContext.camPos = camera.position;

@@ -127,6 +127,7 @@ vec3 light_pbr_no_gi(vec3 pos, vec3 normal, vec3 baseColor, vec4 material, vec3 
 }
 
 vec3 light_pbr_shadow_no_gi(vec3 pos, vec3 normal, vec3 baseColor, vec4 material, vec3 lightDir, vec3 lightColor, vec3 reflection) {
+    
     const float roughness = material.g; 
     const float metallic  = material.b; 
 
@@ -158,6 +159,7 @@ vec3 light_pbr_shadow_no_gi(vec3 pos, vec3 normal, vec3 baseColor, vec4 material
 
 
 vec3 light_pbr_shadow_gi(vec3 pos, vec3 normal, vec3 baseColor, vec4 material, vec3 lightDir, vec3 lightColor, vec3 reflection, vec3 diffuse) {
+    return diffuse;
     const float roughness = material.g; 
     const float metallic  = material.b; 
 

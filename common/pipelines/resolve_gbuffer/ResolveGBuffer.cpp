@@ -32,14 +32,21 @@ ResolveGBufferPipeline::allocate(glm::uvec2 resolution)
       .name = "Sampling points",
     });
     samplingPoints.map();
-    auto* points = reinterpret_cast<glm::vec4*>(samplingPoints.data());
-    
-    for(size_t i = 0; i < 400; i++) {
-      float r = rand_float();
-      float a = rand_float();
-      points[i] = glm::vec4((r - 0.5) * cos(2 * M_PIf * a), (r - 0.5) * sin(2 * M_PIf * a), 0, 0); 
-    }
+    regenerateSamplingPoints(); 
     diffuse.allocate({resolution.x / 2, resolution.y / 2});
+}
+
+void
+ResolveGBufferPipeline::regenerateSamplingPoints() {
+  srand((unsigned)seed);
+  
+  auto* points = reinterpret_cast<glm::vec4*>(samplingPoints.data());
+    
+  for(size_t i = 0; i < 400; i++) {
+    float r = rand_float();
+    float a = rand_float();
+    points[i] = glm::vec4((r - 0.5) * cos(2 * M_PIf * a), (r - 0.5) * sin(2 * M_PIf * a), 0, 0); 
+  }
 }
 
 void 
@@ -192,6 +199,11 @@ ResolveGBufferPipeline::drawGui()
   ImGui::Checkbox("Enable secondary lighting sources", &secondaryLightSources);
 
   ImGui::Checkbox("Normal as color[WIP]", &normalAsAlbedo);
+
+  ImGui::InputInt("Seed", &seed);
+  if(ImGui::Button("Regenerate sampling points")) {
+    regenerateSamplingPoints();
+  }
 }
 
 void 

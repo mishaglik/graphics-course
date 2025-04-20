@@ -44,7 +44,7 @@ layout(push_constant) uniform pc_t
 } params;
 
 
-const vec2 resolution = vec2(1280, 720);
+const vec2 resolution = vec2(1280 / 2, 720 / 2);
 #include "position.glsl"
 #include "shadow.glsl"
 #include "pbr.glsl"
@@ -55,39 +55,53 @@ vec3 diffuseRSM_I(vec3 cam_pos, vec3 cam_normal, int wId) {
 
   const vec4 posLightClipSpace = world.mProjView[wId] * vec4(world_pos, 1.0f);
 
-  const mat4 inv = inverse(world.mProjView[wId]);
-
   const vec3 posLightSpaceNDC = posLightClipSpace.xyz / posLightClipSpace.w;
   
   const vec3 shadowTexCoord = vec3(posLightSpaceNDC.xy*0.5f + vec2(0.5f), wId-1);
 
   const bool  outOfView = (shadowTexCoord.x < 0.0001f || shadowTexCoord.x > 0.9999f || shadowTexCoord.y < 0.0001f || shadowTexCoord.y > 0.9999f);
   if(outOfView) {
-    return vec3(0);
+    return vec3(0, 0, 0);
   }
 
   vec3 diffuse = vec3(0);
 
   int samples = 0;
   for(int i = 0; i < 400; i++) {
-    vec3 texCoord = shadowTexCoord + 0.01 * vec3(samplingPoints[i].xy, 0);
-    if(texCoord.x > 1 || texCoord.x < 0 || texCoord.y > 1 || texCoord.y < 0) {
+    const vec3 offs = 0.015 * vec3(samplingPoints[i].xy, 0);
+    const vec3 texCoord = shadowTexCoord + offs;
+    if(texCoord.x > 1 || texCoord.x < 0 || texCoord.y > 1 || texCoord.y < 0 || texture(shadow_depth, texCoord).r > 0.9999) {
         continue;
     }
     samples++;
-    vec3 second_world_coord = getWorldPos(getCamPos(getScreenPos(texCoord.xy, texture(shadow_depth, texCoord).w, texture(shadow_wc, texCoord).r), world.mProj[wId]), world.mIView[wId]);
+    vec3 second_world_coord = getWorldPos(
+                                getCamPos(
+                                  getScreenPos(
+                                    texCoord.xy, 
+                                    texture(shadow_depth, texCoord).r, 
+                                    texture(shadow_wc, texCoord).r), 
+                                  world.mProj[wId]), 
+                                world.mIView[wId]
+                              );
+
     vec3 second_cam_coord   = (world.mView[0] * vec4(second_world_coord, 1)).xyz;
-    vec3 second_cam_normal  = texture(shadow_normal, texCoord).xyz;
-    vec3 between = second_world_coord - cam_pos;
+    vec3 second_cam_normal  = normalize(texture(shadow_normal, texCoord).xyz);
+    vec3 between = second_cam_coord - cam_pos;
     vec3 baseColor = texture(shadow_albedo, texCoord).rgb;
     float roughness = texture(shadow_material, texCoord).g;
-    vec3 local_diffuse = lambertian(baseColor) * max(dot(second_cam_normal, -between), 0) * max(dot(cam_normal, between), 0) / dot(between, between) / dot(between, between);
-    // diffuse += lambertian(baseColor) * vec3(max(dot(second_cam_normal, -between), 0) * max(dot(cam_normal, between), 0));
+    float dist = dot(between, between);
+    vec3 local_diffuse = lambertian(baseColor) * dot(offs, offs) * max(dot(second_cam_normal, -between), 0) * max(dot(cam_normal, between), 0) / (dist * dist);
     diffuse += local_diffuse;
   }
+  diffuse *= 100000;
 
-  if(posLightSpaceNDC.z < textureLod(shadow_depth, vec3(shadowTexCoord), 0).x + 0.001f) {
-    diffuse += vec3(1);
+  if(posLightSpaceNDC.z < textureLod(shadow_depth, vec3(shadowTexCoord), 0).w + 0.001f) {
+    const vec3 n = normalize(cam_normal);
+    const vec3 lightPos = (world.mView[0] * normalize(vec4(params.position.xyz, 0))).xyz;
+    const vec3 l = normalize(lightPos);
+    const float ndotl = clamp(dot(n, l), 0, 1); 
+
+    diffuse += vec3(ndotl);
   }
 
   return diffuse;
@@ -98,7 +112,7 @@ vec3 diffuseRSM(vec3 cam_pos, vec3 cam_normal) {
   float s = -1.f;
   vec3 diffuse = vec3(0);
   for(int i = textureSize(shadow_depth, 0).z; i > 0; --i) {
-    diffuse += diffuseRSM_I(cam_pos, cam_normal, i);
+    diffuse = max(diffuse, diffuseRSM_I(cam_pos, cam_normal, i));
   }
   return max(diffuse, vec3(0.05));
 }
@@ -121,7 +135,7 @@ void main(void)
 
 
     if(params.gi > 0) {
-        out_fragColor.rgb = diffuseRSM(pos, cNormal);
+        out_fragColor.rgb = min(diffuseRSM(pos, cNormal), vec3(1));
     } else {
         out_fragColor.rgb = vec3(max(ndotl, 0.05));
     }

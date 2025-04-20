@@ -36,6 +36,8 @@ private:
     void renderLights(vk::CommandBuffer cmd_buf);
     void renderSphereDeferred(vk::CommandBuffer cmd_buf, targets::GBuffer& source, const RenderContext& ctx);
     void renderSphere        (vk::CommandBuffer cmd_buf, const RenderContext& ctx);
+
+    void regenerateSamplingPoints();
 private:
   etna::GraphicsPipeline diffuseLightPipeline{};
   etna::GraphicsPipeline deferredLightPipeline{};
@@ -49,7 +51,7 @@ private:
   struct PushConstants {
     glm::vec4 pos, color; 
     int pbr;
-    int gi;
+    int gi=1;
   } pushConstants; 
 
   struct PushConstantsSphere{
@@ -64,6 +66,8 @@ private:
 
   bool normalAsAlbedo = false;
   bool globalIllumination = true;
+
+  int seed = 0;
 };
 
 }

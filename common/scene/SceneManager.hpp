@@ -10,6 +10,7 @@
 
 #include "LightSource.hpp"
 #include "Material.hpp"
+#include "scene/ParticlesManager.hpp"
 #include "scene/SingleResourceManager.hpp"
 #include "scene/ResourceManager.hpp"
 #include "scene/TerrainManager.hpp"
@@ -80,6 +81,7 @@ public:
 
   scene::ResourceManager& resources() { return m_resources; }
   scene::TerrainManager& terrain() { return m_terrain; }
+  scene::ParticlesManager& particles() { return m_particles; }
 
   void finalizeTextures() { m_resources.finalize(); }
 
@@ -146,5 +148,5 @@ private:
 
   scene::ResourceManager m_resources;
   scene::TerrainManager m_terrain {m_resources};
-
+  scene::ParticlesManager m_particles;
 };

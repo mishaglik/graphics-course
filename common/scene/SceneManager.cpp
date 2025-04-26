@@ -46,6 +46,9 @@ SceneManager::SceneManager()
   }
   m_skybox = m_resources.emplaceTexture(std::move(sbTexture));
 
+  m_particles.allocate();
+  m_particles.loadTextures();
+
 }
 
 std::optional<tinygltf::Model> SceneManager::loadModel(std::filesystem::path path)
@@ -651,6 +654,8 @@ void SceneManager::setupLights()
     auto id = lightSources.emplace(glm::vec4{10 * randCoord(), rand() % 10 + 14, 10 * randCoord(), 1.f}, randomColor(), 0.1f, 2.f * randomColor(), randomColor());
     lightSources.get(id).floatingAmplitude.w *= lightSources[id].visibleRadius / 10;
   }
+  Material::Id id = m_resources.emplaceMaterial(Material{.baseColor=glm::vec4(1, 1, 0, 0.5)});
+  m_particles.addEmitter(scene::ParticlesEmitter(scene::ParticlesEmitter::ParticleType::Board, glm::vec4(45, 45, 45, 0), id, {}));
 }
 
 std::vector<Texture::Id> SceneManager::loadModelResources(std::filesystem::path path, const tinygltf::Model& model)

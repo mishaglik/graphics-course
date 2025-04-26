@@ -1,9 +1,14 @@
-#version 450
+
+#version 460
 #extension GL_ARB_separate_shader_objects : enable
+#extension GL_ARB_shader_draw_parameters : require
+#extension GL_EXT_nonuniform_qualifier : require
 #extension GL_GOOGLE_include_directive : require
 
 #include "unpack_attributes.glsl"
 #include "projview.hpp"
+#include "material.hpp"
+#include "drawCmd.hpp"
 
 
 layout(location = 0) in vec4 vPosNorm;
@@ -18,6 +23,7 @@ layout(push_constant) uniform params_t
   vec3 startPos;
   uint relemIdx;
   uint wId;
+  uint material;
 } params;
 
 
@@ -28,14 +34,26 @@ layout (location = 0 ) out VS_OUT
   vec4 wTangent;
   vec2 texCoord;
   vec2 normTexCoord;
+  flat uint material;
 } vOut;
 
 layout (std140, set = 0, binding = 0) readonly buffer ims_t {
   mat4 mModels[]; 
 } ims;
 
-layout(set = 1, binding = 3) uniform WVPM_t {
+
+layout (std140, set = 1, binding = 0) readonly buffer mat_t {
+  GpuMaterial materials[N_MAX_MATERIALS]; 
+};
+
+layout(set = 1, binding = 1) uniform sampler2D textures[N_MAX_TEXTURES];
+
+layout(set = 2, binding = 0) uniform WVPM_t {
   WorldViewProjMatrices world;
+};
+
+layout(set = 3, binding = 0) readonly buffer drawcmd_t {
+  DrawCmd commands[16];
 };
 
 out gl_PerVertex { vec4 gl_Position; };
@@ -55,5 +73,8 @@ void main(void)
   vOut.texCoord = vTexCoordAndTang.xy;
   vOut.normTexCoord = vNormTexCoord.xy;
 
-  gl_Position   = world.mProjView[params.wId] * vec4(vOut.wPos, 1.0);
+  vOut.material = commands[gl_DrawID].material;
+
+  gl_Position = world.mProjView[params.wId] * vec4(vOut.wPos, 1.0);
+
 }

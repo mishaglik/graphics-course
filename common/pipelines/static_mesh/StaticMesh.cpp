@@ -28,6 +28,8 @@ StaticMeshPipeline::allocate()
     });
     instanceMatricesBuf.map();
 
+   
+
     defaultSampler = etna::Sampler({
       .filter = vk::Filter::eLinear,
       .name = "staticMeshSampler",
@@ -104,24 +106,6 @@ StaticMeshPipeline::setup()
         },
     });
 
-    // shadowPipeline = pipelineManager.createGraphicsPipeline(
-    //   "staticmesh_shadow",
-    //   etna::GraphicsPipeline::CreateInfo{
-    //     .vertexShaderInput = sceneVertexInputDesc,
-    //     .rasterizationConfig =
-    //       vk::PipelineRasterizationStateCreateInfo{
-    //         .polygonMode = vk::PolygonMode::eFill,
-    //         .cullMode = vk::CullModeFlagBits::eBack,
-    //         .frontFace = vk::FrontFace::eCounterClockwise,
-    //         .lineWidth = 1.f,
-    //       },
-        
-    //     .fragmentShaderOutput =
-    //       {
-    //         // .colorAttachmentFormats = RenderTarget::Shadow::COLOR_ATTACHMENT_FORMATS,
-    //         .depthAttachmentFormat = RenderTarget::Shadow::DEPTH_ATTACHMENT_FORMAT,
-    //       },
-    //   });
 }
 
 void 
@@ -144,15 +128,7 @@ StaticMeshPipeline::debugInput(const Keyboard& kb)
 void
 StaticMeshPipeline::render(vk::CommandBuffer cmd_buf,  const RenderContext& ctx)
 {
-  
-  // etna::RenderTargetState renderTargets(
-  //   cmd_buf,
-  //   {{0, 0}, {ctx.resolution.x, ctx.resolution.y}},
-  //   gBufferColorAttachments,
-  //   gBufferDepthAttachment
-  // );
     
-
   cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.getVkPipeline());
   if (!ctx.sceneMgr->getVertexBuffer())
     return;
@@ -172,8 +148,17 @@ StaticMeshPipeline::render(vk::CommandBuffer cmd_buf,  const RenderContext& ctx)
   {
     etna::Binding{0, instanceMatricesBuf.genBinding()},
   });
+  auto set1 = ctx.sceneMgr->resources().getSet();
+  auto set2 = etna::create_descriptor_set(
+    staticMesh.getDescriptorLayoutId(2),
+    cmd_buf,
+    {{etna::Binding{0, ctx.worldViewMatrices.genBinding()}}}
+  );
   auto relems = ctx.sceneMgr->getRenderElements();
   std::size_t firstInstance = 0;
+
+
+  auto* commands = reinterpret_cast<DrawCmd* >(drawCommandsBuf.data());
   for (std::size_t j = 0; j < relems.size(); ++j)
   {
     //Skip drawing water as it is rendered by terrain
@@ -183,37 +168,35 @@ StaticMeshPipeline::render(vk::CommandBuffer cmd_buf,  const RenderContext& ctx)
     }  
     if (nInstances[j] != 0)
     {
-      Material::Id mid = relems[j].materialId;
-      auto& material = ctx.sceneMgr->get(mid);
-      auto& baseColorImage = ctx.sceneMgr->get(material.baseColorTexture).image;
-      auto& normalImage =  ctx.sceneMgr->get(normalMap ? material.normalTexture : ctx.sceneMgr->resources().primitiveTexture(0x4)).image;
-      auto& metallicRoughnessImage = ctx.sceneMgr->get(normalMap ?  material.metallicRoughnessTexture : ctx.sceneMgr->resources().primitiveTexture(0)).image;
-      auto set1 = etna::create_descriptor_set(
-        staticMesh.getDescriptorLayoutId(1),
-        cmd_buf,
-        {
-          etna::Binding{0, baseColorImage        .genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
-          etna::Binding{1, normalImage           .genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
-          etna::Binding{2, metallicRoughnessImage.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
-          etna::Binding{3, ctx.worldViewMatrices.genBinding()},
-        });
-      pushConst2M.color = material.baseColor;
-      pushConst2M.emr_factors = material.EMR_Factor;
-      cmd_buf.bindDescriptorSets(
-        vk::PipelineBindPoint::eGraphics,
-        pipeline.getVkPipelineLayout(),
-        0,
-        {set0.getVkSet(), set1.getVkSet()},
-        {});
-
       const auto& relem = relems[j];
-      cmd_buf.pushConstants<PushConstants>(
-        pipeline.getVkPipelineLayout(), vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, {pushConst2M});
-      cmd_buf.drawIndexed(
-        relem.indexCount, static_cast<uint32_t>(nInstances[j]), relem.indexOffset, relem.vertexOffset, static_cast<uint32_t>(firstInstance));
-      firstInstance += nInstances[j];
+      
+      commands[j].cmd.setIndexCount(relem.indexCount);
+      commands[j].cmd.setInstanceCount(nInstances[j]);
+      commands[j].cmd.setFirstIndex(relem.indexOffset);
+      commands[j].cmd.setVertexOffset(relem.vertexOffset);
+      commands[j].cmd.setFirstInstance(firstInstance);
+      commands[j].material = glm::uint(relem.materialId);
     }
+    firstInstance += nInstances[j];
   }
+
+  auto set3 = etna::create_descriptor_set(
+    staticMesh.getDescriptorLayoutId(3),
+    cmd_buf,
+    {{etna::Binding{0, drawCommandsBuf.genBinding()}}}
+  );
+
+  cmd_buf.bindDescriptorSets(
+    vk::PipelineBindPoint::eGraphics,
+    pipeline.getVkPipelineLayout(),
+    0,
+    {set0.getVkSet(), set1, set2.getVkSet(), set3.getVkSet()},
+    {}
+  );
+
+  cmd_buf.pushConstants<PushConstants>(
+    pipeline.getVkPipelineLayout(), vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, {pushConst2M});
+  cmd_buf.drawIndexedIndirect(drawCommandsBuf.get(), 0, relems.size(), static_cast<uint32_t>(sizeof(DrawCmd)));
 }
 
 static bool 
@@ -239,6 +222,21 @@ IsNotVisble(const glm::mat2x3 /*bounds*/, const glm::mat4x4& /*transform*/)
         rc.x >  lc.z || 
         rc.y >  lc.z;
   #endif
+}
+
+void 
+StaticMeshPipeline::reserve(std::size_t n) {
+  spdlog::info("n = {}", n);
+  nInstances.assign(n, 0); 
+  auto& ctx = etna::get_context();
+
+  drawCommandsBuf = ctx.createBuffer({
+    .size = n * sizeof(DrawCmd),
+    .bufferUsage = vk::BufferUsageFlagBits::eIndirectBuffer | vk::BufferUsageFlagBits::eStorageBuffer,
+    .memoryUsage = VMA_MEMORY_USAGE_CPU_TO_GPU,
+    .name = "drawCommandsBuf",
+  });
+  drawCommandsBuf.map();
 }
 
 void 

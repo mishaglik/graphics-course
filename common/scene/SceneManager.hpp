@@ -81,9 +81,9 @@ public:
   scene::ResourceManager& resources() { return m_resources; }
   scene::TerrainManager& terrain() { return m_terrain; }
 
-  
-private:
+  void finalizeTextures() { m_resources.finalize(); }
 
+private:
   std::optional<tinygltf::Model> loadModel(std::filesystem::path path);
 
 

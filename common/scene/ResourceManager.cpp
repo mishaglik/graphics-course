@@ -7,9 +7,15 @@
 
 #include "stb_image.h"
 
+
 namespace scene {
 
 void ResourceManager::init() {
+    m_sampler = etna::Sampler({
+      .name = "Default",
+    });  
+
+    
     Texture::Id undefinedTex = loadFromFile(GRAPHICS_COURSE_RESOURCES_ROOT "/textures/undefined.png");
     if(undefinedTex != Texture::Id::Undefined) {
         spdlog::log(spdlog::level::critical, "Undefined texture has bad Id");
@@ -48,12 +54,20 @@ void ResourceManager::init() {
             vk::ImageLayout::eShaderReadOnlyOptimal, 
             vk::ImageAspectFlagBits::eColor
         );
-        m_colorTextures[i] = m_textures.emplace(std::move(tex));
+        m_colorTextures[i] = emplaceTexture(std::move(tex));
     }    
     ETNA_CHECK_VK_RESULT(cmdBuf.end());
     cmdMgr->submitAndWait(cmdBuf);
+    m_materialsBuffer = etna::get_context().createBuffer({
+      .size = uint32_t(N_MAX_MATERIALS * sizeof(GpuMaterial)),
+      .bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer,
+      .memoryUsage = VMA_MEMORY_USAGE_CPU_TO_GPU,
+      .name = "materials",
+    });
+    m_materialsBuffer.map();
 
-    auto undefinedMaterial = m_materials.emplace(Material{
+
+    auto undefinedMaterial = emplaceMaterial(Material{
         .baseColorTexture = Texture::Id::Undefined,
         .metallicRoughnessTexture = primitiveTexture(0x0),
         .emissiveFactorTexture    = primitiveTexture(0x0),
@@ -62,6 +76,14 @@ void ResourceManager::init() {
         spdlog::log(spdlog::level::critical, "Undefined material has bad Id");
         std::terminate();
     }
+
+
+}
+
+//TODO: Remove CPU material storage at all. 
+void 
+ResourceManager::copyLastMaterial() {
+
 }
 
 Texture::Id 
@@ -153,7 +175,38 @@ ResourceManager::loadFromFile(std::filesystem::path filepath)
     spdlog::info("New texture: {} {{", m_textures.size());
     spdlog::info("    .name={}", uri);
     spdlog::info("}}");
-    return m_textures.emplace(std::move(img));
+
+    return emplaceTexture(std::move(img));
+}
+
+void 
+ResourceManager::finalize() {
+  auto staticMesh = etna::get_shader_program("staticmesh_shader");
+  if(m_materials.size() > N_MAX_MATERIALS) {
+    spdlog::error("Resource manager: m_materials.size() > N_MAX_MATERIALS");
+    return;
+  }
+  
+  for(size_t i = 0; i < std::min(std::size_t(N_MAX_MATERIALS), m_materials.size()); ++i) {
+    GpuMaterial* gmat = gpuMaterial() + i;
+    Material& cmat = m_materials.get(static_cast<Material::Id>(i));
+    
+    gmat->baseColorTexture         = static_cast<glm::uint>(cmat.baseColorTexture        );
+    gmat->normalTexture            = static_cast<glm::uint>(cmat.normalTexture           );
+    gmat->metallicRoughnessTexture = static_cast<glm::uint>(cmat.metallicRoughnessTexture);
+    gmat->emissiveFactorTexture    = static_cast<glm::uint>(cmat.emissiveFactorTexture   );
+    
+    gmat->baseColor  = cmat.baseColor;
+    gmat->emr_factor = cmat.EMR_Factor;
+  }
+
+  m_bindings.emplace_back(etna::Binding{0, m_materialsBuffer.genBinding()});
+  m_set = etna::create_persistent_descriptor_set(
+    staticMesh.getDescriptorLayoutId(1),
+    m_bindings,
+    true
+  );
+
 }
 
 }

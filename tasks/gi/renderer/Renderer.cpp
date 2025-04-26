@@ -25,12 +25,21 @@ void Renderer::initVulkan(std::span<const char*> instance_extensions)
 
   deviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
+  vk::PhysicalDeviceFeatures2 features{.features = {.tessellationShader=1, .multiDrawIndirect=1, .fillModeNonSolid=1,}};
+
+  vk::PhysicalDeviceVulkan11Features features11{.shaderDrawParameters=1,};
+  vk::PhysicalDeviceVulkan12Features features12{.descriptorIndexing=1, .shaderSampledImageArrayNonUniformIndexing=1, .shaderStorageBufferArrayNonUniformIndexing=1, .descriptorBindingVariableDescriptorCount=1, .runtimeDescriptorArray=1, };
+  features11.setPNext(&features12);
+  features.setPNext(&features11);
+
+
+
   etna::initialize(etna::InitParams{
     .applicationName = "gi_renderer",
     .applicationVersion = VK_MAKE_VERSION(0, 1, 0),
     .instanceExtensions = instanceExtensions,
     .deviceExtensions = deviceExtensions,
-    .features = vk::PhysicalDeviceFeatures2{.features = {.tessellationShader=1, .fillModeNonSolid=1}},
+    .features = features,
     .physicalDeviceIndexOverride = {},
     .numFramesInFlight = 1,
   });

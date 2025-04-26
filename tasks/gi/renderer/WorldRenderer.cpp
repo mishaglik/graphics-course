@@ -65,7 +65,7 @@ void WorldRenderer::loadScene(std::filesystem::path path)
     sceneMgr->selectScene(path);
   }
   scenePipeline2.loadScene(*sceneMgr);
-  
+  sceneMgr->finalizeTextures();
 }
 
 void WorldRenderer::loadShaders()
@@ -286,6 +286,7 @@ void WorldRenderer::renderWorld(
 
     scenePipeline2.render(cmd_buf, renderContext);
   }
+
 
   if(enableShadow) {
 

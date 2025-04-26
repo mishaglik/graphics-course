@@ -13,6 +13,7 @@ add_subdirectory(water)
 add_subdirectory(fog)
 add_subdirectory(box)
 add_subdirectory(scene)
+add_subdirectory(particles)
 
 add_library(pipelines INTERFACE)
 
@@ -27,6 +28,7 @@ target_link_libraries(pipelines INTERFACE
     scene_pipeline
     water_pipeline
     fog_pipeline
+    particles_pipeline
 )
 
 add_custom_target(pipeline_shaders DEPENDS 
@@ -40,5 +42,6 @@ add_custom_target(pipeline_shaders DEPENDS
     water_pipeline_shaders
     fog_pipeline_shaders
     box_pipeline_shaders
+    particles_pipeline_shaders
     # scene_pipeline_shaders
 )

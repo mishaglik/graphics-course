@@ -40,6 +40,8 @@ public:
     }
 
     Texture::Id primitiveTexture(uint8_t rgba); 
+    
+    Texture::Id createSingleColorTexture(glm::vec4 color); 
 
     Texture::Id loadFromFile(std::filesystem::path path);
 

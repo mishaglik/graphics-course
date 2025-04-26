@@ -72,12 +72,11 @@ void ResourceManager::init() {
         .metallicRoughnessTexture = primitiveTexture(0x0),
         .emissiveFactorTexture    = primitiveTexture(0x0),
     });
+
     if (undefinedMaterial != Material::Id::Undefined) {
         spdlog::log(spdlog::level::critical, "Undefined material has bad Id");
         std::terminate();
     }
-
-
 }
 
 //TODO: Remove CPU material storage at all. 
@@ -92,6 +91,42 @@ ResourceManager::primitiveTexture(uint8_t rgba)
     rgba &= 0xF;
     return m_colorTextures[rgba];
 }
+
+Texture::Id 
+ResourceManager::createSingleColorTexture(glm::vec4 color)
+{    
+  auto cmdMgr = etna::get_context().createOneShotCmdMgr();
+  auto cmdBuf = cmdMgr->start();
+  Texture::Id id = Texture::Id::Invalid;
+  ETNA_CHECK_VK_RESULT(cmdBuf.begin(vk::CommandBufferBeginInfo{}));
+  {
+    etna::Image tex = etna::get_context().createImage({
+      .extent = {1, 1, 1},
+      .name = "stub",
+      .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+      .type = vk::ImageType::e2D,
+    });
+
+    etna::RenderTargetState renderTargets(
+        cmdBuf,
+        {{0, 0}, {1, 1}},
+        {{.image=tex.get(), .view=tex.getView({}), .clearColorValue={color.r, color.g, color.b, color.a}}},
+        {}
+    );
+    etna::set_state(
+        cmdBuf, 
+        tex.get(), 
+        vk::PipelineStageFlagBits2::eAllCommands, 
+        vk::AccessFlagBits2::eShaderSampledRead, 
+        vk::ImageLayout::eShaderReadOnlyOptimal, 
+        vk::ImageAspectFlagBits::eColor
+    );
+    id = emplaceTexture(std::move(tex));
+  }
+  ETNA_CHECK_VK_RESULT(cmdBuf.end());
+  cmdMgr->submitAndWait(cmdBuf);
+  return id;
+}    
 
 Texture::Id 
 ResourceManager::loadFromFile(std::filesystem::path filepath)

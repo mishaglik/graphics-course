@@ -4,7 +4,7 @@
 #include "cpp_glsl_compat.h"
 
 #define N_MAX_MATERIALS 32
-#define N_MAX_TEXTURES 35
+#define N_MAX_TEXTURES 36
 
 struct GpuMaterial{
     shader_uint baseColorTexture;

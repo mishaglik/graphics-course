@@ -1,5 +1,5 @@
 
-add_library(gui ImGuiRenderer.cpp)
+add_library(gui ImGuiRenderer.cpp Bezier.cpp)
 
 target_include_directories(gui PUBLIC ..)
 

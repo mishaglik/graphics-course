@@ -17,6 +17,7 @@
 SceneManager::SceneManager()
   : oneShotCommands{etna::get_context().createOneShotCmdMgr()}
   , m_transferHelper{etna::BlockingTransferHelper::CreateInfo{.stagingSize = 4096 * 4096 * 4}}
+  , m_particles(m_resources)
 {
   m_resources.init();
   m_terrain.allocate();
@@ -556,6 +557,7 @@ void SceneManager::selectScene(std::filesystem::path path)
 
 
   setupLights();
+  setupParticles();
   uploadData(verts, inds);
 }
 
@@ -654,12 +656,60 @@ void SceneManager::setupLights()
     auto id = lightSources.emplace(glm::vec4{10 * randCoord(), rand() % 10 + 14, 10 * randCoord(), 1.f}, randomColor(), 0.1f, 2.f * randomColor(), randomColor());
     lightSources.get(id).floatingAmplitude.w *= lightSources[id].visibleRadius / 10;
   }
-  Material::Id id = m_resources.emplaceMaterial(Material{.baseColor=glm::vec4(1, 1, 0, 0.5)});
-  m_particles.addEmitter(scene::ParticlesEmitter(scene::ParticlesEmitter::ParticleType::Board, glm::vec4(45, 45, 45, 0), id, {}));
+  
+}
+
+void SceneManager::setupParticles() {
+  Texture::Id smoke = m_resources.loadArrayedFromFile(GRAPHICS_COURSE_RESOURCES_ROOT "/textures/particles/campfire_smoke.png");
+  Material::Id coal = m_resources.emplaceMaterial(Material{.baseColorTexture=m_resources.primitiveTexture(0xF), .baseColor=glm::vec4(1, 1, 0, 0.9)});
+  Material::Id smokeM = m_resources.emplaceMaterial(Material{.baseColorTexture=smoke, .baseColor=glm::vec4(1, 1, 1, 1)});
+  {  
+  scene::ParticlesEmitter::SpawnerParams fireParams{
+    .rate = 0.01f,
+    .maxSpeed = 7.f,
+    .direction = glm::vec3(0, 1, 0),
+    .directionFactor = 0.7f,
+    .speedRandomFactor = 0.25f,
+    .spawnRadius=0.4f,
+    .lifetime=5.f,
+  };
+  EmitterInfo emi {
+    .position = glm::vec4(10, 45, 10, 1),
+    .size = glm::vec2(0.75f, 0.75f),
+    .type = (glm::uint)scene::ParticlesEmitter::ParticleType::Box,
+    .material = glm::uint(coal),
+    .fadeColor = glm::vec4(1, 0, 0, 0.1f),
+    .fadeSize_pad = glm::vec4(0),
+    .fadeBezier={0.758f, 0.133f, 1.f, 1.f}
+  };
+  m_particles.addEmitter(scene::ParticlesEmitter(emi, fireParams));
+  }
+  {  
+    scene::ParticlesEmitter::SpawnerParams fireParams{
+      .rate = 0.5f,
+      .maxSpeed = 5.f,
+      .direction = glm::vec3(0, 1, 0),
+      .directionFactor = 0.5f,
+      .speedRandomFactor = 0.75f,
+      .spawnRadius=0.4f,
+      .lifetime=10.f,
+    };
+    EmitterInfo emi {
+      .position = glm::vec4(10, 45, 10, 1),
+      .size = glm::vec2(3, 3),
+      .type = (glm::uint)scene::ParticlesEmitter::ParticleType::Board,
+      .material = glm::uint(smokeM),
+      .fadeColor = glm::vec4(1, 1, 1, 0.4f),
+      .fadeSize_pad = glm::vec4(1, 1, 0, 0),
+      .fadeBezier={0, 0, 1, 1}
+    };
+    m_particles.addEmitter(scene::ParticlesEmitter(emi, fireParams));
+  }
 }
 
 std::vector<Texture::Id> SceneManager::loadModelResources(std::filesystem::path path, const tinygltf::Model& model)
 {
+  
   std::vector<Texture::Id> texIds;
   texIds.reserve(model.images.size());
   for (auto tex : model.images) {

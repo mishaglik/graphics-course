@@ -214,9 +214,101 @@ ResourceManager::loadFromFile(std::filesystem::path filepath)
     return emplaceTexture(std::move(img));
 }
 
+Texture::Id 
+ResourceManager::loadArrayedFromFile(std::filesystem::path filepath)
+{
+  #if 0
+    if(m_textures.size() > 0) {
+      return Texture::Id::Undefined;
+    }
+  #endif
+    auto& ctx = etna::get_context();
+    int width, height, nChans;
+    auto uri = filepath.filename().generic_string<char>();
+    auto* imageBytes =
+      stbi_load(filepath.generic_string<char>().c_str(), &width, &height, &nChans, STBI_rgb_alpha);
+    
+    
+    if (imageBytes == nullptr)
+    {
+      spdlog::log(spdlog::level::err, "Image \"{}\" load is unsuccessful", uri);
+      return Texture::Id::Invalid;
+    }
+    int side = std::min(width, height);
+    size_t size = static_cast<std::size_t>(width * height * 4);
+
+    auto buf = ctx.createBuffer({
+      .size = static_cast<vk::DeviceSize>(size),
+      .bufferUsage = vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eTransferDst,
+      .name = "tmp load buf",
+    });
+
+    etna::BlockingTransferHelper transferHelper({
+      .stagingSize = size,
+    });
+
+    auto cmdMgr = ctx.createOneShotCmdMgr();
+    transferHelper.uploadBuffer(
+      *cmdMgr, buf, 0, std::span<const std::byte>((std::byte*)imageBytes, size));
+    const uint32_t layers = static_cast<uint32_t>(std::max(width, height) / std::min(width, height));
+    auto img = ctx.createImage({
+      .extent = {static_cast<uint32_t>(side), static_cast<uint32_t>(side), 1},
+      .name = uri,
+      .format = vk::Format::eR8G8B8A8Unorm,
+      .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled |
+        vk::ImageUsageFlagBits::eTransferDst,
+      .layers = layers,
+    });
+
+    auto cmdBuf = cmdMgr->start();
+    ETNA_CHECK_VK_RESULT(cmdBuf.begin(vk::CommandBufferBeginInfo{}));
+    {
+      etna::set_state(
+        cmdBuf,
+        img.get(),
+        vk::PipelineStageFlagBits2::eTransfer,
+        vk::AccessFlagBits2::eTransferWrite,
+        vk::ImageLayout::eTransferDstOptimal,
+        vk::ImageAspectFlagBits::eColor);
+      etna::flush_barriers(cmdBuf);
+      
+      vk::BufferImageCopy bic[1];
+      bic[0].setImageExtent({static_cast<uint32_t>(side), static_cast<uint32_t>(side), 1});
+      bic[0].setImageOffset({});
+      bic[0].setImageSubresource({
+        .aspectMask = vk::ImageAspectFlagBits::eColor,
+        .baseArrayLayer = 0,
+        .layerCount = layers,
+      });
+
+
+      cmdBuf.copyBufferToImage(buf.get(), img.get(), vk::ImageLayout::eTransferDstOptimal, bic);
+
+      etna::set_state(
+        cmdBuf,
+        img.get(),
+        vk::PipelineStageFlagBits2::eFragmentShader,
+        vk::AccessFlagBits2::eShaderRead,
+        vk::ImageLayout::eShaderReadOnlyOptimal,
+        vk::ImageAspectFlagBits::eColor);
+
+      etna::flush_barriers(cmdBuf);
+    }
+    ETNA_CHECK_VK_RESULT(cmdBuf.end());
+    cmdMgr->submitAndWait(std::move(cmdBuf));
+    spdlog::info("New texture: {} {{", m_textures.size());
+    spdlog::info("    .name={}", uri);
+    spdlog::info("    .layers={}", layers);
+    spdlog::info("}}");
+
+    return emplaceTexture(std::move(img));
+}
+
+
 void 
 ResourceManager::finalize() {
   auto staticMesh = etna::get_shader_program("staticmesh_shader");
+  auto particles  = etna::get_shader_program("particles_shader");
   if(m_materials.size() > N_MAX_MATERIALS) {
     spdlog::error("Resource manager: m_materials.size() > N_MAX_MATERIALS");
     return;
@@ -239,6 +331,13 @@ ResourceManager::finalize() {
   m_set = etna::create_persistent_descriptor_set(
     staticMesh.getDescriptorLayoutId(1),
     m_bindings,
+    true
+  );
+
+  m_bindingsArrayed.emplace_back(etna::Binding{0, m_materialsBuffer.genBinding()});
+  m_setArrayed = etna::create_persistent_descriptor_set(
+    particles.getDescriptorLayoutId(1),
+    m_bindingsArrayed,
     true
   );
 

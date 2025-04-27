@@ -539,7 +539,7 @@ WorldRenderer::drawGui()
   
   ImGui::Image(ImTextureID(tex[renderContext.camWorldId]), ImVec2{imageSize * static_cast<float>(gbuffer2.getResolution().x), imageSize * static_cast<float>(gbuffer2.getResolution().y)});
   ImGui::End();
-
+  sceneMgr->particles().drawGui();
 }
 
 void

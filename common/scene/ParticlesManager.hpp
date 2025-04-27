@@ -2,11 +2,13 @@
 #define SCENE_PARTICLESMANAGER_HPP
 
 #include "ParticlesEmitter.hpp"
+#include "scene/ResourceManager.hpp"
 
 namespace scene {
 
 class ParticlesManager {
 public:
+    explicit ParticlesManager(ResourceManager& resources) : m_resources(resources) {}
     void allocate();
         
     void loadTextures() {}
@@ -17,9 +19,9 @@ public:
         m_emitters.emplace_back(std::move(emitter));
     }
 
-    void update(float time);
+    void update(glm::vec4 z_view, float time);
 
-    etna::BufferBinding genBinding() { return m_particles.genBinding(); }
+    
 
     std::size_t size() const { return m_emitters.size(); }
 
@@ -29,9 +31,9 @@ private:
     void reserve(std::size_t n);
 
 private:
+    ResourceManager& m_resources;
     std::vector<ParticlesEmitter> m_emitters;
-    etna::Buffer m_particles;
-    std::size_t m_capacity = 0;
+    EmitterInfo m_newEmitterInfo;
 };
 
 }

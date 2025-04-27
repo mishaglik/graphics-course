@@ -128,6 +128,7 @@ private:
   void uploadData(std::span<const Vertex> vertices, std::span<const std::uint32_t>);
 
   void setupLights();
+  void setupParticles();
 
 private:
   tinygltf::TinyGLTF loader;
@@ -149,4 +150,5 @@ private:
   scene::ResourceManager m_resources;
   scene::TerrainManager m_terrain {m_resources};
   scene::ParticlesManager m_particles;
+
 };

@@ -171,10 +171,10 @@ StaticMeshPipeline::render(vk::CommandBuffer cmd_buf,  const RenderContext& ctx)
       const auto& relem = relems[j];
       
       commands[j].cmd.setIndexCount(relem.indexCount);
-      commands[j].cmd.setInstanceCount(nInstances[j]);
+      commands[j].cmd.setInstanceCount((uint32_t)nInstances[j]);
       commands[j].cmd.setFirstIndex(relem.indexOffset);
       commands[j].cmd.setVertexOffset(relem.vertexOffset);
-      commands[j].cmd.setFirstInstance(firstInstance);
+      commands[j].cmd.setFirstInstance((uint32_t)firstInstance);
       commands[j].material = glm::uint(relem.materialId);
     }
     firstInstance += nInstances[j];
@@ -196,7 +196,7 @@ StaticMeshPipeline::render(vk::CommandBuffer cmd_buf,  const RenderContext& ctx)
 
   cmd_buf.pushConstants<PushConstants>(
     pipeline.getVkPipelineLayout(), vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, {pushConst2M});
-  cmd_buf.drawIndexedIndirect(drawCommandsBuf.get(), 0, relems.size(), static_cast<uint32_t>(sizeof(DrawCmd)));
+  cmd_buf.drawIndexedIndirect(drawCommandsBuf.get(), 0, static_cast<uint32_t>(relems.size()), static_cast<uint32_t>(sizeof(DrawCmd)));
 }
 
 static bool 

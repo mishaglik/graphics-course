@@ -31,7 +31,7 @@ public:
 
     void prepare(vk::CommandBuffer /*cmd_buf*/, const RenderContext& context) { 
         glm::vec4 zView = glm::vec4(context.worldView[0][2], context.worldView[1][2], context.worldView[2][2], context.worldView[3][2]);
-        context.sceneMgr->particles().update(zView, context.frameTime); 
+        context.sceneMgr->particles().update(zView, (float)context.frameTime); 
     }
 
     void render (vk::CommandBuffer cmd_buf, const RenderContext& context);

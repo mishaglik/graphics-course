@@ -112,7 +112,7 @@ void
 ParticlesPipeline::render(vk::CommandBuffer cmd_buf, const RenderContext& ctx)
 {
   pushConstants.mProjView = ctx.worldViewProj;
-  pushConstants.frameTime = ctx.frameTime;
+  pushConstants.frameTime = (float)ctx.frameTime;
   ETNA_PROFILE_GPU(cmd_buf, pipelines_particles_render);
   {
     auto particlesShader = etna::get_shader_program("particles_shader");

@@ -71,9 +71,9 @@ ParticlesEmitter::update(glm::vec4 z_view, float time)
         m_lastSpawnTime = time;
         emitParticle();
     }
-    std::stable_sort(m_particles.begin(), m_particles.end(), [=](const ParticleCpuInfo& lhs, const ParticleCpuInfo& rhs) -> bool {
-        return glm::dot(glm::vec4(glm::vec3(lhs.position), 1), z_view) > glm::dot(glm::vec4(glm::vec3(rhs.position), 1), z_view);
-    });
+    // std::stable_sort(m_particles.begin(), m_particles.end(), [=](const ParticleCpuInfo& lhs, const ParticleCpuInfo& rhs) -> bool {
+    //     return glm::dot(glm::vec4(glm::vec3(lhs.position), 1), z_view) > glm::dot(glm::vec4(glm::vec3(rhs.position), 1), z_view);
+    // });
     m_prevTime = time;
     m_info.fadeBezier[0] = m_bezier[0];
     m_info.fadeBezier[1] = m_bezier[1];

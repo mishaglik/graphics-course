@@ -273,7 +273,6 @@ void WorldRenderer::renderWorld(
 
   updateRenderCtxt();
   scenePipeline2.prepare(cmd_buf, renderContext);
-  particlesPipeline2.prepare(cmd_buf, renderContext);
 
   ETNA_PROFILE_GPU(cmd_buf, renderToGBuffer);
   {
@@ -350,6 +349,7 @@ void WorldRenderer::renderWorld(
   }
 
   resolveGPipeline2.prepare(cmd_buf, gbuffer2, shadowGBuffer2, shadowCascades, renderContext);
+  particlesPipeline2.prepare(cmd_buf, renderContext);
 
   { 
     ETNA_PROFILE_GPU(cmd_buf, renderToBackbuffer);

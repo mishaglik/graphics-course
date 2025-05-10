@@ -25,7 +25,8 @@ layout (std140, set = 1, binding = 0) readonly buffer mat_t {
 
 layout(push_constant) uniform pc {
     mat4 mProjView;
-    uint material;
+    float frameTime;
+    float dt;
 } params;
 
 
@@ -34,4 +35,5 @@ void main() {
     float pos = floor(vIn.fade * textureSize(textures[materials[material].baseColorTexture], 0).z + 0.1);
     out_fragColor = texture(textures[materials[material].baseColorTexture], vec3(vIn.texCoord, pos)) * materials[material].baseColor;
     out_fragColor *= mix(vec4(1), einfo[vIn.drawID].fadeColor, vIn.fade);
+    out_fragColor.a = 1;
 }

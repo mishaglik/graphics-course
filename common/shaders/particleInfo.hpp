@@ -7,7 +7,7 @@ struct ParticleInfo {
     shader_vec4 position;
 };
 #define N_MAX_EMITTERS 64
-#define N_MAX_PARTICLES_PER_DRAW 1024
+#define N_MAX_PARTICLES_PER_DRAW 4096
 struct EmitterInfo {
     shader_vec4  position;
     shader_vec2  size;

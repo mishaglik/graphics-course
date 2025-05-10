@@ -29,20 +29,22 @@ public:
     
     void debugInput(const Keyboard& /*kb*/);
 
-    void prepare(vk::CommandBuffer /*cmd_buf*/, const RenderContext& context) { 
-        glm::vec4 zView = glm::vec4(context.worldView[0][2], context.worldView[1][2], context.worldView[2][2], context.worldView[3][2]);
-        context.sceneMgr->particles().update(zView, (float)context.frameTime); 
-    }
+    void prepare(vk::CommandBuffer /*cmd_buf*/, const RenderContext& context);
 
+    
     void render (vk::CommandBuffer cmd_buf, const RenderContext& context);
+    void barrierBefore(vk::CommandBuffer cmd_buf, const RenderContext& context);
+    void barrierAfter (vk::CommandBuffer cmd_buf, const RenderContext& context);
 private: 
 private:
-    etna::GraphicsPipeline pipeline;
+    etna::GraphicsPipeline graphicPipeline;
+    etna::ComputePipeline  computePipeline;
     etna::Buffer commands, particles, emitters;
     
     struct PushConstants {
         glm::mat4x4 mProjView;
         float frameTime;
+        float dt;
     } pushConstants;
 };
 

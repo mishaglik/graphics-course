@@ -58,7 +58,7 @@ private:
 
     WaterPipeline waterGenerator;
     bool wireframe = false;
-    bool updateEnabled = true;
+    bool updateEnabled = false;
     bool ready     = false;
 
     etna::DescriptorSet set1;

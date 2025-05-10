@@ -14,4 +14,5 @@ target_link_libraries(particles_pipeline PUBLIC etna targets gui PRIVATE scene r
 target_add_shaders(particles_pipeline
   shaders/particles.vert
   shaders/particles.frag
+  shaders/particles.comp
 )

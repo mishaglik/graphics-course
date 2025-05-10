@@ -1,0 +1,258 @@
+#version 450
+#extension GL_ARB_separate_shader_objects : enable
+#extension GL_GOOGLE_include_directive : require
+
+#include "particleInfo.hpp"
+#include "projview.hpp"
+
+struct DrawIndirectCommand {
+    uint vertexCount;
+    uint instanceCount;
+    uint firstVertex;
+    uint firstInstance;
+};
+
+#define BLOCK_SIZE 32
+layout(local_size_x = BLOCK_SIZE) in;
+
+layout(set = 0, binding = 0, std430) buffer et_t{
+  EmitterInfo einfo[N_MAX_EMITTERS];
+};
+
+#define N_MAX_PARTICLES_TOTAL (2*BLOCK_SIZE*N_MAX_EMITTERS)
+
+// layout(set = 0, binding = 1) buffer ppos_t { vec4 ppos[N_MAX_PARTICLES_TOTAL]; };
+// layout(set = 0, binding = 2) buffer pvel_t { vec4 pvel[N_MAX_PARTICLES_TOTAL]; };
+layout(set = 0, binding = 1) buffer res_t  { vec4 res [N_MAX_PARTICLES_TOTAL]; };
+
+layout(set = 0, binding = 2) buffer cmd_t  { DrawIndirectCommand cmd [N_MAX_EMITTERS]; };
+
+layout(set = 1, binding = 0) uniform WVPM_t {
+  WorldViewProjMatrices world;
+};
+
+layout(push_constant) uniform pc {
+    mat4 mProjView;
+    float frameTime;
+    float dt;
+} params;
+
+float rand(vec2 c){
+	return fract(sin(dot(c.xy, vec2(12.7898,78.233)) + cos(dot(c.xy, vec2(-12315.5767, 3524.56)))) * 43718.5453);
+}
+
+shared uint randSeed;
+float randf() {
+    return rand(params.frameTime * vec2(gl_WorkGroupID.x, atomicAdd(randSeed, 1)));
+}
+
+vec3 randnvec3() {
+    return normalize(2 * vec3(randf(), randf(), randf()) - vec3(1));
+}
+
+void emitParticle(uint dst) {
+    // uint emitter = gl_WorkGroupID.x;
+    // const vec3 pos = einfo[emitter].position.xyz + einfo[emitter].spawnRadius * randnvec3();
+    // const vec3 dir = mix(randnvec3(), einfo[emitter].direction.xyz, einfo[emitter].directionFactor);
+
+    // const vec3 vel = einfo[emitter].maxSpeed * mix(1, randf(), einfo[emitter].speedRandomFactor) * dir;
+
+    // ppos[dst].xyz = pos;
+    // ppos[dst].w = 1;
+    // barrier();
+
+    // pvel[dst].xyz = vel;
+    // pvel[dst].w   = -1 / einfo[emitter].lifetime;
+    // barrier();
+}
+
+shared uint dead[BLOCK_SIZE];
+
+void deadReduce() {
+    barrier();
+    if(gl_LocalInvocationID.x + BLOCK_SIZE / 2 < BLOCK_SIZE) {
+        dead[gl_LocalInvocationID.x] += dead[gl_LocalInvocationID.x + BLOCK_SIZE /    2];
+        dead[gl_LocalInvocationID.x] += dead[gl_LocalInvocationID.x + BLOCK_SIZE /    4];
+        dead[gl_LocalInvocationID.x] += dead[gl_LocalInvocationID.x + BLOCK_SIZE /    8];
+        dead[gl_LocalInvocationID.x] += dead[gl_LocalInvocationID.x + BLOCK_SIZE /   16];
+        dead[gl_LocalInvocationID.x] += dead[gl_LocalInvocationID.x + BLOCK_SIZE /   32];
+        // dead[gl_LocalInvocationID.x] += dead[gl_LocalInvocationID.x + BLOCK_SIZE /   64];
+        // dead[gl_LocalInvocationID.x] += dead[gl_LocalInvocationID.x + BLOCK_SIZE /  128];
+        // dead[gl_LocalInvocationID.x] += dead[gl_LocalInvocationID.x + BLOCK_SIZE /  256];
+        // dead[gl_LocalInvocationID.x] += dead[gl_LocalInvocationID.x + BLOCK_SIZE /  512];
+        // dead[gl_LocalInvocationID.x] += dead[gl_LocalInvocationID.x + BLOCK_SIZE / 1024];
+    }
+    barrier();
+}
+
+shared uint spawnSemaphore;
+
+void simulateEmitter(uint start, uint size) {
+    // dead[gl_LocalInvocationID.x] = 0;
+    // bool needSpawn = params.frameTime - einfo[gl_WorkGroupID.x].lastSpawnTime > einfo[gl_WorkGroupID.x].rate;
+    // spawnSemaphore = 0;
+    // barrier();
+    // for(uint batch = 0; batch < (size + (BLOCK_SIZE - 1)) / BLOCK_SIZE; batch++) {
+    //     uint idx = start + BLOCK_SIZE * batch + gl_LocalInvocationID.x;
+    //     vec4 pos = ppos[idx] + pvel[idx] * 0.5 * params.dt;
+    //     barrier();
+    //     ppos[idx] = pos;
+    //     if(pos.w <= 0) {
+    //         dead[gl_LocalInvocationID.x] += 1;
+    //         if(needSpawn && spawnSemaphore == 0 && atomicAdd(spawnSemaphore, 1) == 0) {
+    //             emitParticle(idx);
+    //             needSpawn = false;
+    //             einfo[gl_WorkGroupID.x].lastSpawnTime = params.frameTime;
+    //         }
+    //     }
+    //     barrier();
+    //     // pos.w = pos.w < 0 ? 0.5 : 0;//min(1, 1-pos.w);
+    //     pos.w = min(1, 1-pos.w);
+    //     // pos.xyz = (world.mProjView[0] * vec4(pos.xyz, 1)).xyz;
+    //     res[idx] = pos;
+    //     barrier(); 
+    // }
+    // deadReduce();
+    // barrier(); 
+    // if(gl_LocalInvocationID.x == 0) {
+    //     einfo[gl_WorkGroupID.x].count = size - dead[0];
+    // }
+    // barrier(); 
+}
+
+uint compare(vec4 lhs, vec4 rhs) {
+    uint live1 = lhs.w < 1 ? 1 : 0;
+    uint live2 = rhs.w < 1 ? 1 : 0;
+    if(live1 != live2) 
+        return live1 < live2 ? 1 : 0;
+    return (world.mProjView[0] * vec4(lhs.xyz, 1)).z < (world.mProjView[0] * vec4(rhs.xyz, 1)).z ? 1 : 0;
+}
+
+shared vec4 cachePpos[2 * BLOCK_SIZE];
+void sortCached(uint start, uint reverse) {
+    const uint idx = gl_LocalInvocationID.x;
+    cachePpos[idx]              = res[start + idx];
+    cachePpos[idx + BLOCK_SIZE] = res[start + idx + BLOCK_SIZE];
+    barrier();
+
+    for(uint delta = BLOCK_SIZE; delta > 0; delta >>= 1) {
+        uint base = (idx & (delta-1)) | ((idx & ~(delta-1)) << 1);
+
+        vec4 lhs = cachePpos[base        ];
+        vec4 rhs = cachePpos[base + delta];
+        barrier();
+        if((compare(lhs, rhs) ^ reverse) != 0) {
+            cachePpos[base        ] = rhs;
+            cachePpos[base + delta] = lhs;
+        } 
+        barrier();
+    }
+    res[start + idx]              = cachePpos[idx];
+    res[start + idx + BLOCK_SIZE] = cachePpos[idx + BLOCK_SIZE];
+    barrier();
+}
+
+void presortCached(uint start, uint reverse) {
+    const uint idx = gl_LocalInvocationID.x;
+    cachePpos[idx]              = res[start + idx];
+    cachePpos[idx + BLOCK_SIZE] = res[start + idx + BLOCK_SIZE];
+    barrier();
+
+    for(uint width = 1; width <= BLOCK_SIZE; width <<= 1) {
+        uint local_reverse = (idx & width) != 0 ? 1 : 0;
+        for(uint delta = width; delta > 0; delta >>= 1) {
+            uint base = (idx & (delta-1)) | ((idx & ~(delta-1)) << 1);
+            vec4 lhs = cachePpos[base        ];
+            vec4 rhs = cachePpos[base + delta];
+            barrier();
+            if((compare(lhs, rhs) ^ reverse ^ local_reverse) != 0) {
+                cachePpos[base        ] = rhs;
+                cachePpos[base + delta] = lhs;
+            } 
+            barrier();
+        }
+    }
+    res[start + idx]              = cachePpos[idx];
+    res[start + idx + BLOCK_SIZE] = cachePpos[idx + BLOCK_SIZE];
+    barrier();
+}
+
+void bitonicSort(uint start, uint size) {
+    for(uint i = 0; i < size; i += 2 * BLOCK_SIZE) {
+        presortCached(start+i, (i & (2 * BLOCK_SIZE)) != 0 ? 1 : 0);
+    }
+    barrier();
+    for(uint width = 2 * BLOCK_SIZE; width < size; width <<= 1) {
+        for(uint i = 0; i < size; i += 2 * width) {
+            uint reverse = (i & (2*width)) != 0 ? 1 : 0;
+            //Bitonic block start
+            // for(uint delta = width; delta > 2 * BLOCK_SIZE; delta >>= 1) {
+            for(uint delta = width; delta > 0; delta >>= 1) {
+                for(uint block = 0; block < width; block += BLOCK_SIZE) {
+                    uint idx = block + gl_LocalInvocationID.x;
+                    uint base = (idx & (delta-1)) | ((idx & ~(delta-1)) << 1);
+                    vec4 lhs = res[start + i + base        ];
+                    vec4 rhs = res[start + i + base + delta];
+                    barrier();
+                    if((compare(lhs, rhs) ^ reverse) != 0) {
+                        vec4 tmp = rhs;
+                        rhs = lhs;
+                        lhs = tmp;
+                    } 
+                    res[start + i + base        ] = lhs;
+                    res[start + i + base + delta] = rhs;
+                    barrier();
+                }
+            }
+            // sortCached(start + i, reverse);
+        }
+    }
+    barrier();
+}
+
+uint ceilPowerOfTwo(uint v) {
+    v--;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    v++;
+    return v;
+}
+
+void sortParticles() {
+    uint n = cmd[gl_WorkGroupID.x].instanceCount;
+    uint size = ceilPowerOfTwo(max(n, 64u));
+    uint offset = cmd[gl_WorkGroupID.x].firstInstance;
+    for(uint i = 0; i < size; i += BLOCK_SIZE) {
+        if(i + gl_LocalInvocationID.x >= n) {
+            res[offset + i + gl_LocalInvocationID.x] = vec4(0, 0, 0, 2);
+        }
+        barrier();
+    }
+    bitonicSort(offset, size);
+}
+
+uint typeVertexCount(uint type) {
+    if(type == 4) return 14;
+    return 1;
+}
+
+void main() {
+    randSeed = 0;
+
+    
+
+    // simulateEmitter(gl_WorkGroupID.x * 2 * BLOCK_SIZE, 2 * BLOCK_SIZE);
+    // uint eid = gl_WorkGroupID.x;
+
+    sortParticles();
+    
+    // if(gl_LocalInvocationID.x == 0) {
+    //     cmd[eid].vertexCount = typeVertexCount(einfo[eid].type);
+    //     cmd[eid].instanceCount = 64;//einfo[eid].count;
+    //     cmd[eid].firstVertex   = 0;
+    //     cmd[eid].firstInstance = eid * 2 * BLOCK_SIZE;
+    // }
+}

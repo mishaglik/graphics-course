@@ -33,7 +33,8 @@ layout(set = 2, binding = 0) uniform WVPM_t {
 };
 layout(push_constant) uniform pc {
     mat4 mProjView;
-    uint material;
+    float frameTime;
+    float dt;
 } params;
 
 const uint wId = 0;

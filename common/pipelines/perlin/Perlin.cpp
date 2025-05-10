@@ -143,7 +143,7 @@ void generate_chunk(vk::CommandBuffer cmd_buf, PerlinPipeline& pipeline, targets
             {{0, 0}, {dst.getResolution().x, dst.getResolution().y}},
             target.getColorAttachments(),
             {},
-            BarrierBehavoir::eSuppressBarriers
+            BarrierBehavior::eSuppressBarriers
         };
         pipeline.render(cmd_buf, dst, static_cast<uint32_t>(octaves));
     }
@@ -182,7 +182,7 @@ void update_chunk(vk::CommandBuffer cmd_buf, PerlinPipeline& pipeline, targets::
             {{0, 0}, {dst.getResolution().x, dst.getResolution().y}},
             dst.getColorAttachments(),
             {},
-            BarrierBehavoir::eSuppressBarriers
+            BarrierBehavior::eSuppressBarriers
         };
         pipeline.render(cmd_buf, dst, static_cast<uint32_t>(octaves));
     }

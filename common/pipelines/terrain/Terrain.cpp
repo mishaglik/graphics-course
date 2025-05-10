@@ -225,7 +225,7 @@ TerrainPipeline::regenerateTerrainIfNeeded(vk::CommandBuffer cmd_buf, glm::vec2 
             {{0, 0}, {level.chunk.getResolution().x, level.chunk.getResolution().y}},
             level.chunk.getColorAttachments(),
             {},
-            BarrierBehavoir::eSuppressBarriers
+            BarrierBehavior::eSuppressBarriers
         };
         if(!terrain.isUpToDate()) {
             std::array<vk::ClearAttachment, targets::TerrainChunk::N_COLOR_ATTACHMENTS> clearAtts{

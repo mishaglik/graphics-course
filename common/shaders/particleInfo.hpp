@@ -42,8 +42,9 @@ struct EmitterSpawnInfo {
     shader_float spawnRadius;
 
     shader_float lifetime;
+    shader_float lifetimeRandomFactor;
     shader_float lastSpawnTime;
-    shader_float pad[2];
+    shader_float gravity;
 };
 
 #endif /* SHADERS_PARTICLEINFO_HPP */

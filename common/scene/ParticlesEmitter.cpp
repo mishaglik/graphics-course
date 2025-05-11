@@ -17,6 +17,8 @@ const char* to_string(ParticlesEmitter::ParticleType type) {
     case ParticlesEmitter::ParticleType::ScreenBoard:   return "ScreenBoard";
     case ParticlesEmitter::ParticleType::WorldBoard:    return "WorldBoard";
     case ParticlesEmitter::ParticleType::Box:           return "Box";
+    case ParticlesEmitter::ParticleType::Beam:          return "Beam";
+    case ParticlesEmitter::ParticleType::Ribbon:        return "Ribbon";
 
     case ParticlesEmitter::ParticleType::N_EMITTERS:    
     case ParticlesEmitter::ParticleType::Invalid:
@@ -52,6 +54,7 @@ ParticlesEmitter::drawGui()
     ImGui::LabelText("Type: ", "%s", to_string(ParticleType{m_info.type}));
     ImGui::InputFloat3("Position", &m_info.position.x, "%.3f")  && invalidate();
     ImGui::InputFloat2("Size", &m_info.size.x, "%.3f")          && invalidate();
+    
     ImGui::SliderFloat("Size fade", &m_info.fadeSize, 0.f, 1.f) && invalidate();
     ImGui::ColorEdit4("Fade color", &m_info.fadeColor.x)        && invalidate();
     ImGui::Bezier("Fading", m_bezier ) != 0                     && invalidate();
@@ -66,10 +69,12 @@ ParticlesEmitter::drawGui()
             m_info.direction = glm::normalize(m_info.direction);
         invalidate();
     }
-    ImGui::SliderFloat("Direction factor", &m_info.directionFactor, 0.f, 1.f)      && invalidate();
-    ImGui::SliderFloat("Speed random factor", &m_info.speedRandomFactor, 0.f, 1.f) && invalidate();
-    ImGui::InputFloat("Spawn radius", &m_info.spawnRadius)                         && invalidate();
-    ImGui::InputFloat("Lifetime", &m_info.lifetime)                                && invalidate();
+    ImGui::SliderFloat("Direction factor", &m_info.directionFactor, 0.f, 1.f)                         && invalidate();
+    ImGui::SliderFloat("Speed random factor", &m_info.speedRandomFactor, 0.f, 1.f)                    && invalidate();
+    ImGui::InputFloat("Spawn radius", &m_info.spawnRadius)                                            && invalidate();
+    ImGui::InputFloat("Lifetime", &m_info.lifetime)                                                   && invalidate();
+    ImGui::SliderFloat("Lifetime dispersion", &m_info.lifetimeRandomDispersion, 0.f, m_info.lifetime) && invalidate();
+    ImGui::SliderFloat("Gravity", &m_info.gravity, -20.f, 20.f)                                       && invalidate();
     if(ImGui::Button("Delete")) {
         m_deleted = true;
     }
@@ -96,13 +101,15 @@ ParticlesEmitter::update(EmitterInfo* emitter_info, EmitterSpawnInfo* emitter_sp
     emitter_info->fadeBezier.z   = m_bezier[2];
     emitter_info->fadeBezier.w   = m_bezier[3];
 
-    emitter_spawn_info->direction         = glm::vec4(m_info.direction, m_info.directionFactor);
+    emitter_spawn_info->direction            = glm::vec4(m_info.direction, m_info.directionFactor);
 
-    emitter_spawn_info->rate              = static_cast<decltype(emitter_spawn_info->rate              )>(m_info.spawnRate        );
-    emitter_spawn_info->maxSpeed          = static_cast<decltype(emitter_spawn_info->maxSpeed          )>(m_info.maxSpeed         );
-    emitter_spawn_info->speedRandomFactor = static_cast<decltype(emitter_spawn_info->speedRandomFactor )>(m_info.speedRandomFactor);
-    emitter_spawn_info->spawnRadius       = static_cast<decltype(emitter_spawn_info->spawnRadius       )>(m_info.spawnRadius      );
-    emitter_spawn_info->lifetime          = static_cast<decltype(emitter_spawn_info->lifetime          )>(m_info.lifetime         );
+    emitter_spawn_info->rate                 = static_cast<decltype(emitter_spawn_info->rate                )>(m_info.spawnRate               );
+    emitter_spawn_info->maxSpeed             = static_cast<decltype(emitter_spawn_info->maxSpeed            )>(m_info.maxSpeed                );
+    emitter_spawn_info->speedRandomFactor    = static_cast<decltype(emitter_spawn_info->speedRandomFactor   )>(m_info.speedRandomFactor       );
+    emitter_spawn_info->spawnRadius          = static_cast<decltype(emitter_spawn_info->spawnRadius         )>(m_info.spawnRadius             );
+    emitter_spawn_info->lifetime             = static_cast<decltype(emitter_spawn_info->lifetime            )>(m_info.lifetime                );
+    emitter_spawn_info->lifetimeRandomFactor = static_cast<decltype(emitter_spawn_info->lifetimeRandomFactor)>(m_info.lifetimeRandomDispersion);
+    emitter_spawn_info->gravity              = static_cast<decltype(emitter_spawn_info->gravity             )>(m_info.gravity                 );
 
 }
 }

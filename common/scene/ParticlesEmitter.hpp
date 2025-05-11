@@ -20,6 +20,8 @@ public:
         WorldBoard,
         ScreenBoard,
         Box,
+        Beam,
+        Ribbon,
         N_EMITTERS,
     };
 
@@ -41,6 +43,8 @@ public:
         float directionFactor   = 0.f;
         float speedRandomFactor = 1.f;
         float spawnRadius       = 0.f;
+        float lifetimeRandomDispersion = 0.f;
+        float gravity = 0.f;
         float fadeBezier[4]     = {};
     };
 

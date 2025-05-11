@@ -145,6 +145,8 @@ void WorldRenderer::update(const FramePacket& packet) {
   renderContext.dt = static_cast<float>(packet.currentTime - renderContext.frameTime);
   if(!pause) {
     renderContext.frameTime = packet.currentTime;
+  } else {
+    renderContext.dt = 0;
   }
  
 

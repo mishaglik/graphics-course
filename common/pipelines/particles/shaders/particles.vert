@@ -133,7 +133,34 @@ void cubeParticle() {
   gl_Position = world.mProjView[wId] * vec4(pinfo[gl_InstanceIndex].position.xyz+pos, 1);
 }
 
+void beamParticle() {
+  vec3 pos;
+  if(gl_VertexIndex ==  0) pos = vec3( 0.f,  0.f,  0.f);  
+  if(gl_VertexIndex ==  1) pos = vec3( 0.f,  1.f,  0.f);   
+  if(gl_VertexIndex ==  2) pos = vec3( 1.f,  0.f,  0.f); 
+  if(gl_VertexIndex ==  3) pos = vec3( 1.f,  1.f,  0.f);  
+  vOut.texCoord = pos.xy;
+  const uint eidx = einfo[gl_DrawID].pad[1];
+  pos = (gl_VertexIndex < 2) ? einfo[eidx].position.xyz : pinfo[gl_InstanceIndex].position.xyz;
+  vec3 dr = normalize((world.mView[wId] * vec4(pinfo[gl_InstanceIndex].position.xyz - einfo[eidx].position.xyz, 1)).xyz); 
+  pos = (world.mView[wId] * vec4(pos, 1)).xyz;
+  pos += ((gl_VertexIndex == 1 || gl_VertexIndex == 3) ? 1 : -1) * cross(dr, vec3(0, 0, 1)) * mix(1, einfo[eidx].fadeSize_pad.x, vOut.fade) * einfo[eidx].size.x;
+  gl_Position = world.mProj[wId] * vec4(pos, 1);
+}
 
+void ribbonParticle() {
+  
+  const uint eidx = einfo[gl_DrawID].pad[1];
+  const uint pidx = gl_InstanceIndex + gl_VertexIndex / 2;
+  vOut.fade = pinfo[pidx].position.w;
+  vec3 pos = pinfo[pidx].position.xyz;
+  vOut.texCoord = vec2(gl_VertexIndex % 2, gl_VertexIndex / 2);
+  
+  vec3 dr = normalize((world.mView[wId] * vec4(pos - einfo[eidx].position.xyz, 1)).xyz); 
+  pos = (world.mView[wId] * vec4(pos, 1)).xyz;
+  pos += ((gl_VertexIndex % 2 == 1) ? 1 : -1) * cross(dr, vec3(0, 0, 1)) * mix(1, einfo[eidx].fadeSize_pad.x, vOut.fade) * einfo[eidx].size.x;
+  gl_Position = world.mProj[wId] * vec4(pos, 1);
+}
 
 void main() {
   const uint eidx = einfo[gl_DrawID].pad[1];
@@ -143,6 +170,8 @@ void main() {
   if(type == 2) worldBoardParticle();
   if(type == 3) screenParticle();
   if(type == 4) cubeParticle();
+  if(type == 5) beamParticle();
+  if(type == 6) ribbonParticle();
   
   vOut.fade =  bezier(einfo[eidx].fadeBezier.xy, einfo[eidx].fadeBezier.yz, vOut.fade);
   

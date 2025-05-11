@@ -46,6 +46,14 @@ float randf() {
     return rand(params.frameTime * vec2(gl_WorkGroupID.x, atomicAdd(randSeed, 1)));
 }
 
+float randsf() {
+    return 2 * randf() - 1;
+}
+
+vec3 randvec3() {
+    return 2 * vec3(randf(), randf(), randf()) - vec3(1);
+}
+
 vec3 randnvec3() {
     return normalize(2 * vec3(randf(), randf(), randf()) - vec3(1));
 }
@@ -64,7 +72,7 @@ uint ceilPowerOfTwo(uint v) {
 
 void emitParticle(uint dst) {
     uint emitter = gl_WorkGroupID.x;
-    const vec3 pos = einfo[emitter].position.xyz + espawn[emitter].spawnRadius * randnvec3();
+    const vec3 pos = einfo[emitter].position.xyz + espawn[emitter].spawnRadius * randvec3();
     const vec3 dir = mix(randnvec3(), espawn[emitter].direction.xyz, espawn[emitter].direction.a);
 
     const vec3 vel = espawn[emitter].maxSpeed * mix(1, randf(), espawn[emitter].speedRandomFactor) * dir;
@@ -74,7 +82,7 @@ void emitParticle(uint dst) {
     barrier();
 
     edata[emitter].pvel[dst].xyz = vel;
-    edata[emitter].pvel[dst].w   = 1 / espawn[emitter].lifetime;
+    edata[emitter].pvel[dst].w   = 1 / max(0.001f, espawn[emitter].lifetime + espawn[emitter].lifetimeRandomFactor * randsf());
     barrier();
 }
 
@@ -125,6 +133,7 @@ void simulateEmitter(uint start, uint size) {
     barrier();
     for(uint i = 0; i < N_MAX_PARTICLES_PER_EMITTER; i += BLOCK_SIZE) {
         edata[gl_WorkGroupID.x].ppos[i+gl_LocalInvocationID.x] += params.dt * edata[gl_WorkGroupID.x].pvel[i+gl_LocalInvocationID.x];
+        edata[gl_WorkGroupID.x].pvel[i+gl_LocalInvocationID.x] += params.dt * vec4(0, -espawn[gl_WorkGroupID.x].gravity, 0, 0);
         if (edata[gl_WorkGroupID.x].ppos[i+gl_LocalInvocationID.x].w < 1) {
             reducerBuf[gl_LocalInvocationID.x]++;
         }
@@ -152,8 +161,10 @@ uint compare(vec4 lhs, vec4 rhs) {
     uint live2 = rhs.w < 1 ? 1 : 0;
     if(live1 != live2) 
         return live1 < live2 ? 1 : 0;
-    return lhs.z < rhs.z ? 1 : 0;
-    // return (world.mProjView[0] * vec4(lhs.xyz, 1)).z < (world.mProjView[0] * vec4(rhs.xyz, 1)).z ? 1 : 0;
+    if(einfo[gl_WorkGroupID.x].type == 6) {
+        return lhs.w > rhs.w ? 1 : 0;
+    }
+    return (world.mProjView[0] * vec4(lhs.xyz, 1)).z < (world.mProjView[0] * vec4(rhs.xyz, 1)).z ? 1 : 0;
 }
 
 #define SORT_PPOS
@@ -331,6 +342,7 @@ void sortParticles(uint emitterIndex, uint lastCount) {
 
 uint typeVertexCount(uint type) {
     if(type == 4) return 14;
+    if(type == 6) return 2 * einfo[gl_WorkGroupID.x].count;
     return 4;
 }
 
@@ -385,6 +397,9 @@ void main() {
         if(params.frameTime - espawn[gl_WorkGroupID.x].lastSpawnTime > espawn[gl_WorkGroupID.x].rate && einfo[gl_WorkGroupID.x].count < N_MAX_PARTICLES_PER_EMITTER) {
             emitParticle(einfo[gl_WorkGroupID.x].count);
             espawn[gl_WorkGroupID.x].lastSpawnTime = params.frameTime;
+        }
+        if(einfo[gl_WorkGroupID.x].type == 6) {
+            cmd[emitterIndex].instanceCount = 1;
         }
     }
 }

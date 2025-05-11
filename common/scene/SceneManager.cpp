@@ -696,20 +696,38 @@ void SceneManager::setupParticles() {
       .fadeBezier={0, 0, 1, 1},
   });
   m_particles.addEmitter({
-    .type = scene::ParticlesEmitter::ParticleType::Box,
+    .type = scene::ParticlesEmitter::ParticleType::Beam,
     .material = coal,
     .position = glm::vec4(10, 45, 20, 1),
-    .size = glm::vec2(0.75f, 0.75f),
+    .size = glm::vec2(0.03f, 0.0f),
     .fadeColor = glm::vec4(1, 1, 1, 1.0f),
     .fadeSize = 0,
     .spawnRate = 0.01f,
-    .lifetime=5.f,
-    .maxSpeed = 7.f,
+    .lifetime = 3.f,
+    .maxSpeed = 1.f,
     .direction = glm::vec3(0, 1, 0),
     .directionFactor = 1.0f,
     .speedRandomFactor = 0.0f,
-    .spawnRadius=0.0f,
-    .fadeBezier={0.758f, 0.133f, 1.f, 1.f},
+    .spawnRadius = 1.0f,
+    .gravity = 1.0f,    
+  });
+
+  m_particles.addEmitter({
+    .type = scene::ParticlesEmitter::ParticleType::Ribbon,
+    .material = coal,
+    .position = glm::vec4(-40, 45, 10, 1),
+    .size = glm::vec2(0.1f, 0.f),
+    .fadeColor = glm::vec4(1, 0, 0, 0.4f),
+    .fadeSize = 0,
+    .spawnRate = 0.00f,
+    .lifetime = 5.f,
+    .maxSpeed = 0.f,
+    .direction = glm::vec3(0, 1, 0),
+    .directionFactor = 1.0f,
+    .speedRandomFactor = 0.0f,
+    .spawnRadius = 5.0f,
+    .gravity = 0.06f,
+    .fadeBezier={0.156, 0.f, .117f, 1.f},
   });
 
 }

@@ -17,11 +17,12 @@ public:
 
     void addEmitter(ParticlesEmitter emitter) {
         m_emitters.emplace_back(std::move(emitter));
+        m_emitters.back().allocate();
     }
 
     void update(glm::vec4 z_view, float time);
 
-    
+    const ParticlesEmitter& operator[](std::size_t i) { return m_emitters[i]; }
 
     std::size_t size() const { return m_emitters.size(); }
 

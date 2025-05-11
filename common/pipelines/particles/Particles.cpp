@@ -173,9 +173,23 @@ ParticlesPipeline::prepare(vk::CommandBuffer cmd_buf, const RenderContext& conte
   auto& particleManager = context.sceneMgr->particles();
 
   particleManager.update(zView, (float)context.frameTime); 
+  bindings.clear();
+  bindings.reserve(3 + N_MAX_EMITTERS);
+  
+  bindings.emplace_back(0, emitters.genBinding());
+  bindings.emplace_back(1, particles.genBinding());
+  bindings.emplace_back(2, commands .genBinding());
 
-  vk::DrawIndirectCommand* cmds = reinterpret_cast<vk::DrawIndirectCommand*>(commands.data());
+  // vk::DrawIndirectCommand* cmds = reinterpret_cast<vk::DrawIndirectCommand*>(commands.data());
   EmitterInfo* ems              = reinterpret_cast<EmitterInfo*>(emitters.data());
+  for(std::size_t i = 0; i < particleManager.size(); i++) {
+    ems[i] = particleManager[i].info();
+    bindings.emplace_back(3, particleManager[i].gpuBuf(), i);
+  }
+  for(std::size_t i = particleManager.size(); i < N_MAX_EMITTERS; i++) {
+    bindings.emplace_back(3, particleManager[0].gpuBuf(), i);
+  }
+#if 0
   ParticleInfo* pts             = reinterpret_cast<ParticleInfo*>(particles.data());
   uint32_t cnt = 0;
   uint32_t parts = 0;
@@ -201,7 +215,7 @@ ParticlesPipeline::prepare(vk::CommandBuffer cmd_buf, const RenderContext& conte
     }
     cnt++;
   }
-
+#endif
   barrierBefore(cmd_buf, context);
   {
     auto shader = etna::get_shader_program("particles_compute");
@@ -210,11 +224,7 @@ ParticlesPipeline::prepare(vk::CommandBuffer cmd_buf, const RenderContext& conte
     auto set0 = etna::create_descriptor_set(
       shader.getDescriptorLayoutId(0),
       cmd_buf,
-      {
-        {0, emitters .genBinding()},
-        {1, particles.genBinding()},
-        {2, commands .genBinding()}
-      }
+      bindings
     );
     auto set1 = etna::create_descriptor_set(
       shader.getDescriptorLayoutId(1),
@@ -240,7 +250,7 @@ ParticlesPipeline::prepare(vk::CommandBuffer cmd_buf, const RenderContext& conte
       &pushConstants
     );
 
-    cmd_buf.dispatch(cnt, 1, 1);
+    cmd_buf.dispatch(particleManager.size(), 1, 1);
   }
   barrierAfter(cmd_buf, context);
 

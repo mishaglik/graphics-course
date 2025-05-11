@@ -33,13 +33,15 @@ public:
         float lifetime          = 5.f;
     };
 
-    ParticlesEmitter(ParticleType type, glm::vec4 pos, Material::Id material, SpawnerParams params) : m_info{pos, glm::vec2{1, 1}, uint32_t(type), uint32_t(material), {1, 1, 1, 1}, {1.f, 1.f, 1.f, 1.f}, {}}, m_params(params) {}
+    ParticlesEmitter(ParticleType type, glm::vec4 pos, Material::Id material, SpawnerParams params) : m_info{pos, glm::vec2{1, 1}, uint32_t(type), uint32_t(material), {1, 1, 1, 1}, {1.f, 1.f, 1.f, 1.f}, {}, {}, {}}, m_params(params) {}
     ParticlesEmitter(EmitterInfo info, SpawnerParams params) : m_info{info}, m_params{params} { m_bezier[0] = m_info.fadeBezier[0]; m_bezier[1] = m_info.fadeBezier[1]; m_bezier[2] = m_info.fadeBezier[2]; m_bezier[3] = m_info.fadeBezier[3];}
     explicit ParticlesEmitter(EmitterInfo info) : scene::ParticlesEmitter{info, {}} {}
 
     ParticlesEmitter& setSize(glm::vec2 size) { m_info.size = size; return *this;}
 
     SpawnerParams& spawnerParams() { return m_params; }
+
+    void allocate();
 
     void update(glm::vec4 z_view, float time);
 
@@ -62,6 +64,7 @@ public:
 
     uint32_t verticesPerParticle() const;
 
+    etna::BufferBinding gpuBuf() const { return m_gpuData.genBinding(); }
 private:
     void emitParticle();
 private:
@@ -72,6 +75,7 @@ private:
     float m_camZ = 0.f; 
     float m_bezier[5] = {0.f, 0.f, 1.f, 1.f};
     std::vector<ParticleCpuInfo> m_particles;
+    etna::Buffer m_gpuData;
 };
 const char* to_string(ParticlesEmitter::ParticleType type);
 }

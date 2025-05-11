@@ -1,4 +1,5 @@
 #include "ParticlesEmitter.hpp"
+#include "etna/GlobalContext.hpp"
 #include "imgui.h"
 #include "gui/Bezier.hpp"
 
@@ -23,6 +24,19 @@ const char* to_string(ParticlesEmitter::ParticleType type) {
         return "Invalid";
     }
 }
+
+void
+ParticlesEmitter::allocate() 
+{
+    m_gpuData = etna::get_context().createBuffer({
+        .size = 2 * sizeof(glm::vec4) * N_MAX_PARTICLES_PER_EMITTER,
+        .bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer,
+        .memoryUsage = VMA_MEMORY_USAGE_CPU_TO_GPU,
+        .name = "emitter_gpu_data",
+    });
+    m_gpuData.map();
+}
+
 
 void 
 ParticlesEmitter::drawGui()
@@ -67,18 +81,23 @@ ParticlesEmitter::update(glm::vec4 z_view, float time)
         m_particles[i].position += m_particles[i].velocity * dt;
         m_particles[i].position.w = (time - m_particles[i].birthtime) / m_params.lifetime;
     }
-    if(time - m_lastSpawnTime > m_params.rate && m_particles.size() < N_MAX_PARTICLES_PER_DRAW) {
+    if(time - m_lastSpawnTime > m_params.rate && m_particles.size() < N_MAX_PARTICLES_PER_EMITTER) {
         m_lastSpawnTime = time;
         emitParticle();
     }
-    // std::stable_sort(m_particles.begin(), m_particles.end(), [=](const ParticleCpuInfo& lhs, const ParticleCpuInfo& rhs) -> bool {
-    //     return glm::dot(glm::vec4(glm::vec3(lhs.position), 1), z_view) > glm::dot(glm::vec4(glm::vec3(rhs.position), 1), z_view);
-    // });
+    m_info.count = uint32_t(size());
     m_prevTime = time;
     m_info.fadeBezier[0] = m_bezier[0];
     m_info.fadeBezier[1] = m_bezier[1];
     m_info.fadeBezier[2] = m_bezier[2];
     m_info.fadeBezier[3] = m_bezier[3];
+
+    auto* ppos = reinterpret_cast<glm::vec4* >(m_gpuData.data());
+    auto* pvel = ppos + N_MAX_PARTICLES_PER_EMITTER;
+    for(std::size_t i = 0; i < m_particles.size(); i++) {
+        ppos[i] = m_particles[i].position;
+        pvel[i] = m_particles[i].velocity;
+    }
 }
 
 uint32_t

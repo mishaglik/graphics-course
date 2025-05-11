@@ -12,24 +12,23 @@ struct DrawIndirectCommand {
     uint firstInstance;
 };
 
-#define BLOCK_SIZE 32
+#define BLOCK_SIZE PARTICLE_SIMULATOR_BLOCK_SIZE
 layout(local_size_x = BLOCK_SIZE) in;
 
 layout(set = 0, binding = 0, std430) buffer et_t{
   EmitterInfo einfo[N_MAX_EMITTERS];
 };
 
-#define N_MAX_PARTICLES_TOTAL (2*BLOCK_SIZE*N_MAX_EMITTERS)
 
-// layout(set = 0, binding = 1) buffer ppos_t { vec4 ppos[N_MAX_PARTICLES_TOTAL]; };
-// layout(set = 0, binding = 2) buffer pvel_t { vec4 pvel[N_MAX_PARTICLES_TOTAL]; };
 layout(set = 0, binding = 1) buffer res_t  { vec4 res [N_MAX_PARTICLES_TOTAL]; };
-
 layout(set = 0, binding = 2) buffer cmd_t  { DrawIndirectCommand cmd [N_MAX_EMITTERS]; };
+
+layout(set = 0, binding = 3) buffer ppos_t { vec4 ppos[N_MAX_PARTICLES_PER_EMITTER]; vec4 pvel[N_MAX_PARTICLES_PER_EMITTER]; } edata[N_MAX_EMITTERS];
 
 layout(set = 1, binding = 0) uniform WVPM_t {
   WorldViewProjMatrices world;
 };
+
 
 layout(push_constant) uniform pc {
     mat4 mProjView;
@@ -66,21 +65,44 @@ void emitParticle(uint dst) {
     // barrier();
 }
 
-shared uint dead[BLOCK_SIZE];
 
-void deadReduce() {
+shared uint reducerBuf[BLOCK_SIZE];
+void bufReduce() {
     barrier();
     if(gl_LocalInvocationID.x + BLOCK_SIZE / 2 < BLOCK_SIZE) {
-        dead[gl_LocalInvocationID.x] += dead[gl_LocalInvocationID.x + BLOCK_SIZE /    2];
-        dead[gl_LocalInvocationID.x] += dead[gl_LocalInvocationID.x + BLOCK_SIZE /    4];
-        dead[gl_LocalInvocationID.x] += dead[gl_LocalInvocationID.x + BLOCK_SIZE /    8];
-        dead[gl_LocalInvocationID.x] += dead[gl_LocalInvocationID.x + BLOCK_SIZE /   16];
-        dead[gl_LocalInvocationID.x] += dead[gl_LocalInvocationID.x + BLOCK_SIZE /   32];
-        // dead[gl_LocalInvocationID.x] += dead[gl_LocalInvocationID.x + BLOCK_SIZE /   64];
-        // dead[gl_LocalInvocationID.x] += dead[gl_LocalInvocationID.x + BLOCK_SIZE /  128];
-        // dead[gl_LocalInvocationID.x] += dead[gl_LocalInvocationID.x + BLOCK_SIZE /  256];
-        // dead[gl_LocalInvocationID.x] += dead[gl_LocalInvocationID.x + BLOCK_SIZE /  512];
-        // dead[gl_LocalInvocationID.x] += dead[gl_LocalInvocationID.x + BLOCK_SIZE / 1024];
+    #if BLOCK_SIZE >= 2
+        reducerBuf[gl_LocalInvocationID.x] += reducerBuf[gl_LocalInvocationID.x + BLOCK_SIZE /    2];
+    #endif
+    #if BLOCK_SIZE >= 4
+        reducerBuf[gl_LocalInvocationID.x] += reducerBuf[gl_LocalInvocationID.x + BLOCK_SIZE /    4];
+    #endif
+    #if BLOCK_SIZE >= 8
+        reducerBuf[gl_LocalInvocationID.x] += reducerBuf[gl_LocalInvocationID.x + BLOCK_SIZE /    8];
+    #endif
+    #if BLOCK_SIZE >= 16
+        reducerBuf[gl_LocalInvocationID.x] += reducerBuf[gl_LocalInvocationID.x + BLOCK_SIZE /   16];
+    #endif
+    #if BLOCK_SIZE >= 32
+        reducerBuf[gl_LocalInvocationID.x] += reducerBuf[gl_LocalInvocationID.x + BLOCK_SIZE /   32];
+    #endif
+    #if BLOCK_SIZE >= 64
+        reducerBuf[gl_LocalInvocationID.x] += reducerBuf[gl_LocalInvocationID.x + BLOCK_SIZE /   64];
+    #endif
+    #if BLOCK_SIZE >= 128
+        reducerBuf[gl_LocalInvocationID.x] += reducerBuf[gl_LocalInvocationID.x + BLOCK_SIZE /  128];
+    #endif
+    #if BLOCK_SIZE >= 256
+        reducerBuf[gl_LocalInvocationID.x] += reducerBuf[gl_LocalInvocationID.x + BLOCK_SIZE /  256];
+    #endif
+    #if BLOCK_SIZE >= 512
+        reducerBuf[gl_LocalInvocationID.x] += reducerBuf[gl_LocalInvocationID.x + BLOCK_SIZE /  512];
+    #endif
+    #if BLOCK_SIZE >= 1024
+        reducerBuf[gl_LocalInvocationID.x] += reducerBuf[gl_LocalInvocationID.x + BLOCK_SIZE / 1024];
+    #endif
+    #if BLOCK_SIZE >= 2048
+    #error "BLOCK_SIZE >= 2048 not implemented"
+    #endif
     }
     barrier();
 }
@@ -221,10 +243,10 @@ uint ceilPowerOfTwo(uint v) {
     return v;
 }
 
-void sortParticles() {
-    uint n = cmd[gl_WorkGroupID.x].instanceCount;
+void sortParticles(uint emitterIndex) {
+    uint n = cmd[emitterIndex].instanceCount;
     uint size = ceilPowerOfTwo(max(n, 64u));
-    uint offset = cmd[gl_WorkGroupID.x].firstInstance;
+    uint offset = cmd[emitterIndex].firstInstance;
     for(uint i = 0; i < size; i += BLOCK_SIZE) {
         if(i + gl_LocalInvocationID.x >= n) {
             res[offset + i + gl_LocalInvocationID.x] = vec4(0, 0, 0, 2);
@@ -236,18 +258,57 @@ void sortParticles() {
 
 uint typeVertexCount(uint type) {
     if(type == 4) return 14;
-    return 1;
+    return 4;
+}
+
+uint emitterComparator(uint i) {
+    vec4 lhs = einfo[i].position;
+    vec4 rhs = einfo[gl_WorkGroupID.x].position;
+    if(lhs == rhs) {
+        return i < gl_WorkGroupID.x ? 1 : 0;
+    }
+    return (world.mProjView[0] * vec4(lhs.xyz, 1)).z > (world.mProjView[0] * vec4(rhs.xyz, 1)).z ? 1 : 0;
+}
+
+shared uint emitterIndex;
+uint emitterStartPos() {
+    reducerBuf[gl_LocalInvocationID.x] = 0;
+    emitterIndex = 0;
+    barrier();
+    for(uint i = 0; i < N_MAX_EMITTERS; i += BLOCK_SIZE) {
+        if (i + gl_LocalInvocationID.x < gl_NumWorkGroups.x && emitterComparator(i + gl_LocalInvocationID.x) != 0) {
+            atomicAdd(emitterIndex, 1);
+            reducerBuf[gl_LocalInvocationID.x] += ceilPowerOfTwo(max(2*BLOCK_SIZE, einfo[i+gl_LocalInvocationID.x].count)); //TODO: Take spawning into account
+        }
+    }
+    barrier();
+    bufReduce();
+    uint start = reducerBuf[0];
+    if(gl_LocalInvocationID.x == 0) {
+        cmd[emitterIndex].vertexCount   = typeVertexCount(einfo[gl_WorkGroupID.x].type);
+        cmd[emitterIndex].instanceCount = einfo[gl_WorkGroupID.x].count;
+        cmd[emitterIndex].firstVertex   = 0;
+        cmd[emitterIndex].firstInstance = start;
+        einfo[gl_WorkGroupID.x].pad[0]  = emitterIndex;
+        einfo[emitterIndex]    .pad[1]  = gl_WorkGroupID.x;
+    }
+    barrier();
+    for(uint i = 0; i < N_MAX_PARTICLES_PER_EMITTER; i += BLOCK_SIZE) {
+        res[start + i + gl_LocalInvocationID.x] = edata[gl_WorkGroupID.x].ppos[i + gl_LocalInvocationID.x];
+    }
+    barrier();
+    return emitterIndex;
 }
 
 void main() {
     randSeed = 0;
 
-    
+    uint emitterIndex = emitterStartPos();
 
     // simulateEmitter(gl_WorkGroupID.x * 2 * BLOCK_SIZE, 2 * BLOCK_SIZE);
     // uint eid = gl_WorkGroupID.x;
 
-    sortParticles();
+    sortParticles(emitterIndex);
     
     // if(gl_LocalInvocationID.x == 0) {
     //     cmd[eid].vertexCount = typeVertexCount(einfo[eid].type);

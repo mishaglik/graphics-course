@@ -10,20 +10,6 @@ ParticlesManager::update(glm::vec4 z_view, float time) {
     for(auto& emitter : m_emitters) {
         emitter.update(z_view, time);
     }
-    //As emitters tends to stand still, use bubble sort. 
-    {
-        bool changed = true;
-        while(changed) {
-            changed = false;
-            for(size_t i = 0; i + 1 < m_emitters.size(); i++) {
-                if(m_emitters[i] < m_emitters[i+1]) {
-                    std::swap(m_emitters[i], m_emitters[i+1]);
-                    changed = true;
-                }
-            }
-        }
-    }
-    
 }
 
 void 

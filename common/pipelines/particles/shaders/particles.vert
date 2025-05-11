@@ -78,7 +78,8 @@ void boardParticle() {
   if(gl_VertexIndex ==  2) pos = vec3(-1.f, -1.f,  0.f); 
   if(gl_VertexIndex ==  3) pos = vec3( 1.f, -1.f,  0.f);  
   vOut.texCoord = 0.5 * pos.xy + 0.5;
-  pos.xy *= mix(1, einfo[gl_DrawID].fadeSize_pad.x, vOut.fade) * einfo[gl_DrawID].size;
+  const uint eidx = einfo[gl_DrawID].pad[1];
+  pos.xy *= mix(1, einfo[eidx].fadeSize_pad.x, vOut.fade) * einfo[eidx].size;
   gl_Position = world.mProjView[wId] * vec4(pinfo[gl_InstanceIndex].position.xyz, 1) + world.mProj[wId] * vec4(pos, 0);
 }
 
@@ -89,7 +90,8 @@ void worldBoardParticle() {
   if(gl_VertexIndex ==  2) pos = vec3(-1.f, -1.f,  0.f); 
   if(gl_VertexIndex ==  3) pos = vec3( 1.f, -1.f,  0.f);  
   vOut.texCoord = 0.5 * pos.xy + 0.5;
-  pos.xy *= mix(1, einfo[gl_DrawID].fadeSize_pad.x, vOut.fade) * einfo[gl_DrawID].size;
+  const uint eidx = einfo[gl_DrawID].pad[1];
+  pos.xy *= mix(1, einfo[eidx].fadeSize_pad.x, vOut.fade) * einfo[eidx].size;
   gl_Position = world.mProjView[wId] * vec4(pinfo[gl_InstanceIndex].position.xyz + pos, 1);
 }
 
@@ -100,7 +102,8 @@ void screenParticle() {
   if(gl_VertexIndex ==  2) pos = vec3(-1.f, -1.f,  0.f); 
   if(gl_VertexIndex ==  3) pos = vec3( 1.f, -1.f,  0.f);  
   vOut.texCoord = 0.5 * pos.xy + 0.5;
-  pos.xy *= mix(1, einfo[gl_DrawID].fadeSize_pad.x, vOut.fade) * einfo[gl_DrawID].size;
+  const uint eidx = einfo[gl_DrawID].pad[1];
+  pos.xy *= mix(1, einfo[eidx].fadeSize_pad.x, vOut.fade) * einfo[eidx].size;
   gl_Position = vec4(pos, 0);
 }
 
@@ -122,26 +125,28 @@ void cubeParticle() {
   if(gl_VertexIndex == 13) pos = vec3( 1.f,  1.f, -1.f);
   
   vOut.texCoord = 0.5 * pos.xy + 0.5;
-  vec3 size = vec3(einfo[gl_DrawID].size, 0);
+  const uint eidx = einfo[gl_DrawID].pad[1];
+  vec3 size = vec3(einfo[eidx].size, 0);
   size.z = (size.x + size.y) / 2;
   pos *= size;
-  pos *= mix(1, einfo[gl_DrawID].fadeSize_pad.x, vOut.fade);
+  pos *= mix(1, einfo[eidx].fadeSize_pad.x, vOut.fade);
   gl_Position = world.mProjView[wId] * vec4(pinfo[gl_InstanceIndex].position.xyz+pos, 1);
 }
 
 
 
 void main() {
-  uint type = einfo[gl_DrawID].type;
+  const uint eidx = einfo[gl_DrawID].pad[1];
+  uint type = einfo[eidx].type;
   vOut.fade = pinfo[gl_InstanceIndex].position.w;
   if(type == 1) boardParticle();
   if(type == 2) worldBoardParticle();
   if(type == 3) screenParticle();
   if(type == 4) cubeParticle();
   
-  vOut.fade =  bezier(einfo[gl_DrawID].fadeBezier.xy, einfo[gl_DrawID].fadeBezier.yz, vOut.fade);
+  vOut.fade =  bezier(einfo[eidx].fadeBezier.xy, einfo[eidx].fadeBezier.yz, vOut.fade);
   
-  vOut.material = einfo[gl_DrawID].material;
-  vOut.drawID = gl_DrawID;
+  vOut.material = einfo[eidx].material;
+  vOut.drawID = eidx;
 }
 

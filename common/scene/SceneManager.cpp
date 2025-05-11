@@ -705,6 +705,27 @@ void SceneManager::setupParticles() {
     };
     m_particles.addEmitter(scene::ParticlesEmitter(emi, fireParams));
   }
+  {  
+    scene::ParticlesEmitter::SpawnerParams fireParams{
+      .rate = 0.01f,
+      .maxSpeed = 7.f,
+      .direction = glm::vec3(0, 1, 0),
+      .directionFactor = 1.0f,
+      .speedRandomFactor = 0.0f,
+      .spawnRadius=0.0f,
+      .lifetime=5.f,
+    };
+    EmitterInfo emi {
+      .position = glm::vec4(10, 45, 20, 1),
+      .size = glm::vec2(0.75f, 0.75f),
+      .type = (glm::uint)scene::ParticlesEmitter::ParticleType::Box,
+      .material = glm::uint(coal),
+      .fadeColor = glm::vec4(1, 1, 1, 1.0f),
+      .fadeSize_pad = glm::vec4(0),
+      .fadeBezier={0.758f, 0.133f, 1.f, 1.f}
+    };
+    m_particles.addEmitter(scene::ParticlesEmitter(emi, fireParams));
+  }
 }
 
 std::vector<Texture::Id> SceneManager::loadModelResources(std::filesystem::path path, const tinygltf::Model& model)

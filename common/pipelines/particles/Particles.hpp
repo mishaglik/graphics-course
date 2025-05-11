@@ -40,6 +40,7 @@ private:
     etna::GraphicsPipeline graphicPipeline;
     etna::ComputePipeline  computePipeline;
     etna::Buffer commands, particles, emitters;
+    std::vector<etna::Binding> bindings;
     
     struct PushConstants {
         glm::mat4x4 mProjView;

@@ -15,6 +15,9 @@ struct ParticleInfo {
 #if N_MAX_PARTICLES_PER_EMITTER < 2 * PARTICLE_SIMULATOR_BLOCK_SIZE 
 #error "Particle capacity must be at least 2 BLOCK_SIZE"
 #endif
+//NOTE: IMPORTANT: When changing this struct change next structs accordingly!
+//LINK common/scene/ParticlesEmitter.hpp:26
+//LINK common/scene/ParticlesEmitter.cpp:72
 struct EmitterInfo {
     shader_vec4  position;
     shader_vec2  size;
@@ -27,5 +30,20 @@ struct EmitterInfo {
     shader_uint  pad[3];
 };
 
+//NOTE: IMPORTANT: When changing this struct change next structs accordingly!
+//LINK common/scene/ParticlesEmitter.hpp:26
+//LINK common/scene/ParticlesEmitter.cpp:72
+struct EmitterSpawnInfo {
+    shader_vec4  direction;         //a is direction factor
+    
+    shader_float rate;
+    shader_float maxSpeed;
+    shader_float speedRandomFactor;
+    shader_float spawnRadius;
+
+    shader_float lifetime;
+    shader_float lastSpawnTime;
+    shader_float pad[2];
+};
 
 #endif /* SHADERS_PARTICLEINFO_HPP */

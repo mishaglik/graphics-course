@@ -39,9 +39,9 @@ private:
 private:
     etna::GraphicsPipeline graphicPipeline;
     etna::ComputePipeline  computePipeline;
-    etna::Buffer commands, particles, emitters;
+    etna::Buffer commands, particles;
     std::vector<etna::Binding> bindings;
-    
+
     struct PushConstants {
         glm::mat4x4 mProjView;
         float frameTime;

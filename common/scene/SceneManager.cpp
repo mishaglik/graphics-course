@@ -663,69 +663,55 @@ void SceneManager::setupParticles() {
   Texture::Id smoke = m_resources.loadArrayedFromFile(GRAPHICS_COURSE_RESOURCES_ROOT "/textures/particles/campfire_smoke.png");
   Material::Id coal = m_resources.emplaceMaterial(Material{.baseColorTexture=m_resources.primitiveTexture(0xF), .baseColor=glm::vec4(1, 1, 0, 0.9)});
   Material::Id smokeM = m_resources.emplaceMaterial(Material{.baseColorTexture=smoke, .baseColor=glm::vec4(1, 1, 1, 1)});
-  {  
-  scene::ParticlesEmitter::SpawnerParams fireParams{
-    .rate = 0.01f,
+  
+  m_particles.addEmitter({
+    .type = scene::ParticlesEmitter::ParticleType::Box,
+    .material = coal,
+    .position = glm::vec4(10, 45, 10, 1),
+    .size = glm::vec2(0.75f, 0.75f),
+    .fadeColor = glm::vec4(1, 0, 0, 0.1f),
+    .fadeSize = 0,
+    .spawnRate = 0.01f,
+    .lifetime = 5.f,
     .maxSpeed = 7.f,
     .direction = glm::vec3(0, 1, 0),
     .directionFactor = 0.7f,
     .speedRandomFactor = 0.25f,
     .spawnRadius=0.4f,
-    .lifetime=5.f,
-  };
-  EmitterInfo emi {
-    .position = glm::vec4(10, 45, 10, 1),
-    .size = glm::vec2(0.75f, 0.75f),
-    .type = (glm::uint)scene::ParticlesEmitter::ParticleType::Box,
-    .material = glm::uint(coal),
-    .fadeColor = glm::vec4(1, 0, 0, 0.1f),
-    .fadeSize_pad = glm::vec4(0),
-    .fadeBezier={0.758f, 0.133f, 1.f, 1.f}
-  };
-  m_particles.addEmitter(scene::ParticlesEmitter(emi, fireParams));
-  }
-  {  
-    scene::ParticlesEmitter::SpawnerParams fireParams{
-      .rate = 0.5f,
+    .fadeBezier={0.758f, 0.133f, 1.f, 1.f},
+  });
+  m_particles.addEmitter({
+      .type = scene::ParticlesEmitter::ParticleType::Board,
+      .material = smokeM,
+      .position = glm::vec4(10, 45, 10, 1),
+      .size = glm::vec2(3, 3),
+      .fadeColor = glm::vec4(1, 1, 1, 0.4f),
+      .spawnRate = 0.5f,
+      .lifetime=10.f,
       .maxSpeed = 5.f,
       .direction = glm::vec3(0, 1, 0),
       .directionFactor = 0.5f,
       .speedRandomFactor = 0.75f,
       .spawnRadius=0.4f,
-      .lifetime=10.f,
-    };
-    EmitterInfo emi {
-      .position = glm::vec4(10, 45, 10, 1),
-      .size = glm::vec2(3, 3),
-      .type = (glm::uint)scene::ParticlesEmitter::ParticleType::Board,
-      .material = glm::uint(smokeM),
-      .fadeColor = glm::vec4(1, 1, 1, 0.4f),
-      .fadeSize_pad = glm::vec4(1, 1, 0, 0),
-      .fadeBezier={0, 0, 1, 1}
-    };
-    m_particles.addEmitter(scene::ParticlesEmitter(emi, fireParams));
-  }
-  {  
-    scene::ParticlesEmitter::SpawnerParams fireParams{
-      .rate = 0.01f,
-      .maxSpeed = 7.f,
-      .direction = glm::vec3(0, 1, 0),
-      .directionFactor = 1.0f,
-      .speedRandomFactor = 0.0f,
-      .spawnRadius=0.0f,
-      .lifetime=5.f,
-    };
-    EmitterInfo emi {
-      .position = glm::vec4(10, 45, 20, 1),
-      .size = glm::vec2(0.75f, 0.75f),
-      .type = (glm::uint)scene::ParticlesEmitter::ParticleType::Box,
-      .material = glm::uint(coal),
-      .fadeColor = glm::vec4(1, 1, 1, 1.0f),
-      .fadeSize_pad = glm::vec4(0),
-      .fadeBezier={0.758f, 0.133f, 1.f, 1.f}
-    };
-    m_particles.addEmitter(scene::ParticlesEmitter(emi, fireParams));
-  }
+      .fadeBezier={0, 0, 1, 1},
+  });
+  m_particles.addEmitter({
+    .type = scene::ParticlesEmitter::ParticleType::Box,
+    .material = coal,
+    .position = glm::vec4(10, 45, 20, 1),
+    .size = glm::vec2(0.75f, 0.75f),
+    .fadeColor = glm::vec4(1, 1, 1, 1.0f),
+    .fadeSize = 0,
+    .spawnRate = 0.01f,
+    .lifetime=5.f,
+    .maxSpeed = 7.f,
+    .direction = glm::vec3(0, 1, 0),
+    .directionFactor = 1.0f,
+    .speedRandomFactor = 0.0f,
+    .spawnRadius=0.0f,
+    .fadeBezier={0.758f, 0.133f, 1.f, 1.f},
+  });
+
 }
 
 std::vector<Texture::Id> SceneManager::loadModelResources(std::filesystem::path path, const tinygltf::Model& model)

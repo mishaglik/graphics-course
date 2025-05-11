@@ -33,14 +33,6 @@ ParticlesPipeline::allocate()
       .name = "particles_commands",
     });
     commands.map();
-
-    emitters = ctx.createBuffer({
-      .size =  uint32_t(N_MAX_EMITTERS * sizeof(EmitterInfo)),
-      .bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer,
-      .memoryUsage = VMA_MEMORY_USAGE_CPU_TO_GPU,
-      .name = "particles_emitters",
-    });
-    emitters.map();
 }
 
 void 
@@ -132,7 +124,7 @@ ParticlesPipeline::render(vk::CommandBuffer cmd_buf, const RenderContext& ctx)
       particlesShader.getDescriptorLayoutId(0),
       cmd_buf,
       {
-        etna::Binding{0, emitters.genBinding() },
+        etna::Binding{0, particleManager.emitterGPUData().genBinding(0, N_MAX_EMITTERS * sizeof(EmitterInfo)) },
         etna::Binding{1, particles.genBinding()}
       }
     );
@@ -176,50 +168,21 @@ ParticlesPipeline::prepare(vk::CommandBuffer cmd_buf, const RenderContext& conte
 
   auto& particleManager = context.sceneMgr->particles();
 
-  particleManager.update(zView, (float)context.frameTime); 
+  particleManager.update(); 
   bindings.clear();
   bindings.reserve(3 + N_MAX_EMITTERS);
   
-  bindings.emplace_back(0, emitters.genBinding());
+  bindings.emplace_back(0, particleManager.emitterGPUData().genBinding());
   bindings.emplace_back(1, particles.genBinding());
   bindings.emplace_back(2, commands .genBinding());
 
-  // vk::DrawIndirectCommand* cmds = reinterpret_cast<vk::DrawIndirectCommand*>(commands.data());
-  EmitterInfo* ems              = reinterpret_cast<EmitterInfo*>(emitters.data());
   for(std::size_t i = 0; i < particleManager.size(); i++) {
-    ems[i] = particleManager[i].info();
     bindings.emplace_back(3, particleManager[i].gpuBuf(), i);
   }
   for(std::size_t i = particleManager.size(); i < N_MAX_EMITTERS; i++) {
     bindings.emplace_back(3, particleManager[0].gpuBuf(), i);
   }
-#if 0
-  ParticleInfo* pts             = reinterpret_cast<ParticleInfo*>(particles.data());
-  uint32_t cnt = 0;
-  uint32_t parts = 0;
-  for(auto& emitter : particleManager) {
-    //TODO: Cull
-    cmds[cnt] = vk::DrawIndirectCommand{
-      .vertexCount = emitter.verticesPerParticle(),
-      .instanceCount = uint32_t(emitter.size()),
-      .firstVertex = 0,
-      .firstInstance = parts,
-    };
-    ems[cnt] = emitter.info();
-    uint32_t pos = parts;
-    for(auto& particle: emitter) {
-      pts[pos++].position = particle.position;
-    }
-    parts += glm::ceilPowerOfTwo(std::max(uint32_t(emitter.size()), 64u));
-    if(parts > N_MAX_PARTICLES_PER_DRAW) {
-      //FIXME - Implement; 
-      spdlog::warn("Drawing more than {} particles is not implemented. Truncating", N_MAX_PARTICLES_PER_DRAW);
-      parts = N_MAX_PARTICLES_PER_DRAW;
-      break;
-    }
-    cnt++;
-  }
-#endif
+
   barrierBefore(cmd_buf, context);
   {
     auto shader = etna::get_shader_program("particles_compute");
@@ -261,7 +224,7 @@ ParticlesPipeline::prepare(vk::CommandBuffer cmd_buf, const RenderContext& conte
 }
 
 void 
-ParticlesPipeline::barrierAfter(vk::CommandBuffer cmd_buf, const RenderContext& /* ctx */) {
+ParticlesPipeline::barrierAfter(vk::CommandBuffer cmd_buf, const RenderContext& ctx ) {
   std::array<vk::BufferMemoryBarrier2, 3> bmb = {
     vk::BufferMemoryBarrier2{
       .srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
@@ -276,7 +239,7 @@ ParticlesPipeline::barrierAfter(vk::CommandBuffer cmd_buf, const RenderContext& 
       .srcAccessMask = vk::AccessFlagBits2::eShaderStorageWrite | vk::AccessFlagBits2::eShaderStorageRead,
       .dstStageMask = vk::PipelineStageFlagBits2::eVertexShader | vk::PipelineStageFlagBits2::eFragmentShader,
       .dstAccessMask = vk::AccessFlagBits2::eShaderStorageRead,
-      .buffer = emitters.get(),
+      .buffer = ctx.sceneMgr->particles().emitterGPUData().get(),
       .size = VK_WHOLE_SIZE,
      },
      vk::BufferMemoryBarrier2{
@@ -298,7 +261,7 @@ ParticlesPipeline::barrierAfter(vk::CommandBuffer cmd_buf, const RenderContext& 
 }
 
 void 
-ParticlesPipeline::barrierBefore(vk::CommandBuffer cmd_buf, const RenderContext& /* ctx */) {
+ParticlesPipeline::barrierBefore(vk::CommandBuffer cmd_buf, const RenderContext& ctx ) {
   std::array<vk::BufferMemoryBarrier2, 3> bmb = {
     vk::BufferMemoryBarrier2{
       .srcStageMask = vk::PipelineStageFlagBits2::eVertexShader,
@@ -313,7 +276,7 @@ ParticlesPipeline::barrierBefore(vk::CommandBuffer cmd_buf, const RenderContext&
       .srcAccessMask = vk::AccessFlagBits2::eShaderStorageRead,
       .dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
       .dstAccessMask = vk::AccessFlagBits2::eShaderStorageWrite | vk::AccessFlagBits2::eShaderStorageRead,
-      .buffer = emitters.get(),
+      .buffer = ctx.sceneMgr->particles().emitterGPUData().get(),
       .size = VK_WHOLE_SIZE,
      },
      vk::BufferMemoryBarrier2{

@@ -15,12 +15,12 @@ public:
 
     void drawGui();
 
-    void addEmitter(ParticlesEmitter emitter) {
+    void addEmitter(ParticlesEmitter::EmitterCreateInfo emitter) {
         m_emitters.emplace_back(std::move(emitter));
         m_emitters.back().allocate();
     }
 
-    void update(glm::vec4 z_view, float time);
+    void update();
 
     const ParticlesEmitter& operator[](std::size_t i) { return m_emitters[i]; }
 
@@ -28,13 +28,17 @@ public:
 
     auto begin() { return m_emitters.begin(); }
     auto end()   { return m_emitters.end();   }
+
+    const etna::Buffer& emitterGPUData() const { return m_gpuData; }
+
 private:
     void reserve(std::size_t n);
 
 private:
+    etna::Buffer m_gpuData;
     ResourceManager& m_resources;
     std::vector<ParticlesEmitter> m_emitters;
-    EmitterInfo m_newEmitterInfo;
+    ParticlesEmitter::EmitterCreateInfo m_newEmitterInfo;
 };
 
 }

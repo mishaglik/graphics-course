@@ -16,7 +16,8 @@ struct DrawIndirectCommand {
 layout(local_size_x = BLOCK_SIZE) in;
 
 layout(set = 0, binding = 0, std430) buffer et_t{
-  EmitterInfo einfo[N_MAX_EMITTERS];
+  EmitterInfo       einfo[N_MAX_EMITTERS];
+  EmitterSpawnInfo espawn[N_MAX_EMITTERS];
 };
 
 
@@ -62,19 +63,19 @@ uint ceilPowerOfTwo(uint v) {
 
 
 void emitParticle(uint dst) {
-    // uint emitter = gl_WorkGroupID.x;
-    // const vec3 pos = einfo[emitter].position.xyz + einfo[emitter].spawnRadius * randnvec3();
-    // const vec3 dir = mix(randnvec3(), einfo[emitter].direction.xyz, einfo[emitter].directionFactor);
+    uint emitter = gl_WorkGroupID.x;
+    const vec3 pos = einfo[emitter].position.xyz + espawn[emitter].spawnRadius * randnvec3();
+    const vec3 dir = mix(randnvec3(), espawn[emitter].direction.xyz, espawn[emitter].direction.a);
 
-    // const vec3 vel = einfo[emitter].maxSpeed * mix(1, randf(), einfo[emitter].speedRandomFactor) * dir;
+    const vec3 vel = espawn[emitter].maxSpeed * mix(1, randf(), espawn[emitter].speedRandomFactor) * dir;
 
-    // ppos[dst].xyz = pos;
-    // ppos[dst].w = 1;
-    // barrier();
+    edata[emitter].ppos[dst].xyz = pos;
+    edata[emitter].ppos[dst].w = 0;
+    barrier();
 
-    // pvel[dst].xyz = vel;
-    // pvel[dst].w   = -1 / einfo[emitter].lifetime;
-    // barrier();
+    edata[emitter].pvel[dst].xyz = vel;
+    edata[emitter].pvel[dst].w   = 1 / espawn[emitter].lifetime;
+    barrier();
 }
 
 
@@ -309,15 +310,16 @@ void bitonicSort(uint start, uint size) {
 }
 
 
-void sortParticles(uint emitterIndex) {
-    uint n = cmd[emitterIndex].instanceCount;
-    #ifdef SORT_PPOS
+void sortParticles(uint emitterIndex, uint lastCount) {
+#ifdef SORT_PPOS
     uint offset = 0;
-    uint size = N_MAX_PARTICLES_PER_EMITTER;
-    #else
+    uint size = ceilPowerOfTwo(max(lastCount, 64u));
+#else
+    uint n = cmd[emitterIndex].instanceCount;
     uint offset = cmd[emitterIndex].firstInstance;
     uint size = ceilPowerOfTwo(max(n, 64u));
-    #endif
+#endif
+
 #ifdef SORT_PPOS
     bitonicSort(offset, size);
     moveToRes(emitterIndex);
@@ -372,11 +374,17 @@ uint emitterStartPos() {
 
 void main() {
     randSeed = 0;
-
+    const uint prevSize = min(N_MAX_PARTICLES_PER_EMITTER, einfo[gl_WorkGroupID.x].count+1);
     simulateEmitter(0, N_MAX_PARTICLES_PER_EMITTER);
 
     uint emitterIndex = emitterStartPos();
 
-    sortParticles(emitterIndex);
+    sortParticles(emitterIndex, prevSize);
     
+    if(gl_LocalInvocationID.x == 0) {
+        if(params.frameTime - espawn[gl_WorkGroupID.x].lastSpawnTime > espawn[gl_WorkGroupID.x].rate && einfo[gl_WorkGroupID.x].count < N_MAX_PARTICLES_PER_EMITTER) {
+            emitParticle(einfo[gl_WorkGroupID.x].count);
+            espawn[gl_WorkGroupID.x].lastSpawnTime = params.frameTime;
+        }
+    }
 }

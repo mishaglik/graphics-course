@@ -131,7 +131,7 @@ ResourceManager::createSingleColorTexture(glm::vec4 color)
 Texture::Id 
 ResourceManager::loadFromFile(std::filesystem::path filepath)
 {
-  #if 1
+  #if 0
     if(m_textures.size() > 0) {
       return Texture::Id::Undefined;
     }

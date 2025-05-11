@@ -49,6 +49,18 @@ vec3 randnvec3() {
     return normalize(2 * vec3(randf(), randf(), randf()) - vec3(1));
 }
 
+uint ceilPowerOfTwo(uint v) {
+    v--;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    v++;
+    return v;
+}
+
+
 void emitParticle(uint dst) {
     // uint emitter = gl_WorkGroupID.x;
     // const vec3 pos = einfo[emitter].position.xyz + einfo[emitter].spawnRadius * randnvec3();
@@ -71,34 +83,34 @@ void bufReduce() {
     barrier();
     if(gl_LocalInvocationID.x + BLOCK_SIZE / 2 < BLOCK_SIZE) {
     #if BLOCK_SIZE >= 2
-        reducerBuf[gl_LocalInvocationID.x] += reducerBuf[gl_LocalInvocationID.x + BLOCK_SIZE /    2];
+        reducerBuf[gl_LocalInvocationID.x] += reducerBuf[gl_LocalInvocationID.x + BLOCK_SIZE /    2]; memoryBarrierShared();
     #endif
     #if BLOCK_SIZE >= 4
-        reducerBuf[gl_LocalInvocationID.x] += reducerBuf[gl_LocalInvocationID.x + BLOCK_SIZE /    4];
+        reducerBuf[gl_LocalInvocationID.x] += reducerBuf[gl_LocalInvocationID.x + BLOCK_SIZE /    4]; memoryBarrierShared();
     #endif
     #if BLOCK_SIZE >= 8
-        reducerBuf[gl_LocalInvocationID.x] += reducerBuf[gl_LocalInvocationID.x + BLOCK_SIZE /    8];
+        reducerBuf[gl_LocalInvocationID.x] += reducerBuf[gl_LocalInvocationID.x + BLOCK_SIZE /    8]; memoryBarrierShared();
     #endif
     #if BLOCK_SIZE >= 16
-        reducerBuf[gl_LocalInvocationID.x] += reducerBuf[gl_LocalInvocationID.x + BLOCK_SIZE /   16];
+        reducerBuf[gl_LocalInvocationID.x] += reducerBuf[gl_LocalInvocationID.x + BLOCK_SIZE /   16]; memoryBarrierShared();
     #endif
     #if BLOCK_SIZE >= 32
-        reducerBuf[gl_LocalInvocationID.x] += reducerBuf[gl_LocalInvocationID.x + BLOCK_SIZE /   32];
+        reducerBuf[gl_LocalInvocationID.x] += reducerBuf[gl_LocalInvocationID.x + BLOCK_SIZE /   32]; memoryBarrierShared();
     #endif
     #if BLOCK_SIZE >= 64
-        reducerBuf[gl_LocalInvocationID.x] += reducerBuf[gl_LocalInvocationID.x + BLOCK_SIZE /   64];
+        reducerBuf[gl_LocalInvocationID.x] += reducerBuf[gl_LocalInvocationID.x + BLOCK_SIZE /   64]; memoryBarrierShared();
     #endif
     #if BLOCK_SIZE >= 128
-        reducerBuf[gl_LocalInvocationID.x] += reducerBuf[gl_LocalInvocationID.x + BLOCK_SIZE /  128];
+        reducerBuf[gl_LocalInvocationID.x] += reducerBuf[gl_LocalInvocationID.x + BLOCK_SIZE /  128]; memoryBarrierShared();
     #endif
     #if BLOCK_SIZE >= 256
-        reducerBuf[gl_LocalInvocationID.x] += reducerBuf[gl_LocalInvocationID.x + BLOCK_SIZE /  256];
+        reducerBuf[gl_LocalInvocationID.x] += reducerBuf[gl_LocalInvocationID.x + BLOCK_SIZE /  256]; memoryBarrierShared();
     #endif
     #if BLOCK_SIZE >= 512
-        reducerBuf[gl_LocalInvocationID.x] += reducerBuf[gl_LocalInvocationID.x + BLOCK_SIZE /  512];
+        reducerBuf[gl_LocalInvocationID.x] += reducerBuf[gl_LocalInvocationID.x + BLOCK_SIZE /  512]; memoryBarrierShared();
     #endif
     #if BLOCK_SIZE >= 1024
-        reducerBuf[gl_LocalInvocationID.x] += reducerBuf[gl_LocalInvocationID.x + BLOCK_SIZE / 1024];
+        reducerBuf[gl_LocalInvocationID.x] += reducerBuf[gl_LocalInvocationID.x + BLOCK_SIZE / 1024]; memoryBarrierShared();
     #endif
     #if BLOCK_SIZE >= 2048
     #error "BLOCK_SIZE >= 2048 not implemented"
@@ -107,39 +119,31 @@ void bufReduce() {
     barrier();
 }
 
-shared uint spawnSemaphore;
-
 void simulateEmitter(uint start, uint size) {
-    // dead[gl_LocalInvocationID.x] = 0;
-    // bool needSpawn = params.frameTime - einfo[gl_WorkGroupID.x].lastSpawnTime > einfo[gl_WorkGroupID.x].rate;
-    // spawnSemaphore = 0;
-    // barrier();
-    // for(uint batch = 0; batch < (size + (BLOCK_SIZE - 1)) / BLOCK_SIZE; batch++) {
-    //     uint idx = start + BLOCK_SIZE * batch + gl_LocalInvocationID.x;
-    //     vec4 pos = ppos[idx] + pvel[idx] * 0.5 * params.dt;
-    //     barrier();
-    //     ppos[idx] = pos;
-    //     if(pos.w <= 0) {
-    //         dead[gl_LocalInvocationID.x] += 1;
-    //         if(needSpawn && spawnSemaphore == 0 && atomicAdd(spawnSemaphore, 1) == 0) {
-    //             emitParticle(idx);
-    //             needSpawn = false;
-    //             einfo[gl_WorkGroupID.x].lastSpawnTime = params.frameTime;
-    //         }
-    //     }
-    //     barrier();
-    //     // pos.w = pos.w < 0 ? 0.5 : 0;//min(1, 1-pos.w);
-    //     pos.w = min(1, 1-pos.w);
-    //     // pos.xyz = (world.mProjView[0] * vec4(pos.xyz, 1)).xyz;
-    //     res[idx] = pos;
-    //     barrier(); 
-    // }
-    // deadReduce();
-    // barrier(); 
-    // if(gl_LocalInvocationID.x == 0) {
-    //     einfo[gl_WorkGroupID.x].count = size - dead[0];
-    // }
-    // barrier(); 
+    reducerBuf[gl_LocalInvocationID.x] = 0;
+    barrier();
+    for(uint i = 0; i < N_MAX_PARTICLES_PER_EMITTER; i += BLOCK_SIZE) {
+        edata[gl_WorkGroupID.x].ppos[i+gl_LocalInvocationID.x] += params.dt * edata[gl_WorkGroupID.x].pvel[i+gl_LocalInvocationID.x];
+        if (edata[gl_WorkGroupID.x].ppos[i+gl_LocalInvocationID.x].w < 1) {
+            reducerBuf[gl_LocalInvocationID.x]++;
+        }
+    }
+    bufReduce();
+    if(gl_LocalInvocationID.x == 0) {
+        einfo[gl_WorkGroupID.x].count = N_MAX_PARTICLES_PER_EMITTER;
+        einfo[gl_WorkGroupID.x].count = reducerBuf[0];
+    }
+    barrier();
+}
+
+void moveToRes(uint eidx)
+{
+    uint start = cmd[eidx].firstInstance;
+    uint size  = ceilPowerOfTwo(max(2*BLOCK_SIZE, cmd[eidx].instanceCount));
+    for(uint i = gl_LocalInvocationID.x; i < size; i += BLOCK_SIZE) {
+        res[start + i] = edata[gl_WorkGroupID.x].ppos[i];
+    }
+    barrier();
 }
 
 uint compare(vec4 lhs, vec4 rhs) {
@@ -147,55 +151,104 @@ uint compare(vec4 lhs, vec4 rhs) {
     uint live2 = rhs.w < 1 ? 1 : 0;
     if(live1 != live2) 
         return live1 < live2 ? 1 : 0;
-    return (world.mProjView[0] * vec4(lhs.xyz, 1)).z < (world.mProjView[0] * vec4(rhs.xyz, 1)).z ? 1 : 0;
+    return lhs.z < rhs.z ? 1 : 0;
+    // return (world.mProjView[0] * vec4(lhs.xyz, 1)).z < (world.mProjView[0] * vec4(rhs.xyz, 1)).z ? 1 : 0;
 }
 
+#define SORT_PPOS
+
 shared vec4 cachePpos[2 * BLOCK_SIZE];
+#ifdef SORT_PPOS
+shared vec4 cachePvel[2 * BLOCK_SIZE];
+#endif
 void sortCached(uint start, uint reverse) {
     const uint idx = gl_LocalInvocationID.x;
+    #ifdef SORT_PPOS
+    cachePpos[idx]              = edata[gl_WorkGroupID.x].ppos[start + idx];
+    cachePpos[idx + BLOCK_SIZE] = edata[gl_WorkGroupID.x].ppos[start + idx + BLOCK_SIZE];
+    cachePvel[idx]              = edata[gl_WorkGroupID.x].pvel[start + idx];
+    cachePvel[idx + BLOCK_SIZE] = edata[gl_WorkGroupID.x].pvel[start + idx + BLOCK_SIZE];
+    #else
     cachePpos[idx]              = res[start + idx];
     cachePpos[idx + BLOCK_SIZE] = res[start + idx + BLOCK_SIZE];
+    #endif
     barrier();
 
     for(uint delta = BLOCK_SIZE; delta > 0; delta >>= 1) {
         uint base = (idx & (delta-1)) | ((idx & ~(delta-1)) << 1);
-
-        vec4 lhs = cachePpos[base        ];
-        vec4 rhs = cachePpos[base + delta];
+        vec4 lhs     = cachePpos[base        ];
+        vec4 rhs     = cachePpos[base + delta];
+        #ifdef SORT_PPOS
+        vec4 lhs_vel = cachePvel[base        ];
+        vec4 rhs_vel = cachePvel[base + delta];
+        #endif
         barrier();
         if((compare(lhs, rhs) ^ reverse) != 0) {
             cachePpos[base        ] = rhs;
             cachePpos[base + delta] = lhs;
+            #ifdef SORT_PPOS
+            cachePvel[base        ] = rhs_vel;
+            cachePvel[base + delta] = lhs_vel;
+            #endif
         } 
         barrier();
     }
+    #ifdef SORT_PPOS
+    edata[gl_WorkGroupID.x].ppos[start + idx]              = cachePpos[idx];
+    edata[gl_WorkGroupID.x].ppos[start + idx + BLOCK_SIZE] = cachePpos[idx + BLOCK_SIZE];
+    edata[gl_WorkGroupID.x].pvel[start + idx]              = cachePvel[idx];
+    edata[gl_WorkGroupID.x].pvel[start + idx + BLOCK_SIZE] = cachePvel[idx + BLOCK_SIZE];
+    #else
     res[start + idx]              = cachePpos[idx];
     res[start + idx + BLOCK_SIZE] = cachePpos[idx + BLOCK_SIZE];
+    #endif
     barrier();
 }
 
 void presortCached(uint start, uint reverse) {
     const uint idx = gl_LocalInvocationID.x;
+    #ifdef SORT_PPOS
+    cachePpos[idx]              = edata[gl_WorkGroupID.x].ppos[start + idx];
+    cachePpos[idx + BLOCK_SIZE] = edata[gl_WorkGroupID.x].ppos[start + idx + BLOCK_SIZE];
+    cachePvel[idx]              = edata[gl_WorkGroupID.x].pvel[start + idx];
+    cachePvel[idx + BLOCK_SIZE] = edata[gl_WorkGroupID.x].pvel[start + idx + BLOCK_SIZE];
+    #else
     cachePpos[idx]              = res[start + idx];
     cachePpos[idx + BLOCK_SIZE] = res[start + idx + BLOCK_SIZE];
+    #endif
     barrier();
 
     for(uint width = 1; width <= BLOCK_SIZE; width <<= 1) {
         uint local_reverse = (idx & width) != 0 ? 1 : 0;
         for(uint delta = width; delta > 0; delta >>= 1) {
             uint base = (idx & (delta-1)) | ((idx & ~(delta-1)) << 1);
-            vec4 lhs = cachePpos[base        ];
-            vec4 rhs = cachePpos[base + delta];
+            vec4 lhs     = cachePpos[base        ];
+            vec4 rhs     = cachePpos[base + delta];
+            #ifdef SORT_PPOS
+            vec4 lhs_vel = cachePvel[base        ];
+            vec4 rhs_vel = cachePvel[base + delta];
+            #endif
             barrier();
             if((compare(lhs, rhs) ^ reverse ^ local_reverse) != 0) {
                 cachePpos[base        ] = rhs;
                 cachePpos[base + delta] = lhs;
+                #ifdef SORT_PPOS
+                cachePvel[base        ] = rhs_vel;
+                cachePvel[base + delta] = lhs_vel;
+                #endif
             } 
             barrier();
         }
     }
+    #ifdef SORT_PPOS
+    edata[gl_WorkGroupID.x].ppos[start + idx]              = cachePpos[idx];
+    edata[gl_WorkGroupID.x].ppos[start + idx + BLOCK_SIZE] = cachePpos[idx + BLOCK_SIZE];
+    edata[gl_WorkGroupID.x].pvel[start + idx]              = cachePvel[idx];
+    edata[gl_WorkGroupID.x].pvel[start + idx + BLOCK_SIZE] = cachePvel[idx + BLOCK_SIZE];
+    #else
     res[start + idx]              = cachePpos[idx];
     res[start + idx + BLOCK_SIZE] = cachePpos[idx + BLOCK_SIZE];
+    #endif
     barrier();
 }
 
@@ -208,52 +261,70 @@ void bitonicSort(uint start, uint size) {
         for(uint i = 0; i < size; i += 2 * width) {
             uint reverse = (i & (2*width)) != 0 ? 1 : 0;
             //Bitonic block start
-            // for(uint delta = width; delta > 2 * BLOCK_SIZE; delta >>= 1) {
-            for(uint delta = width; delta > 0; delta >>= 1) {
+            for(uint delta = width; delta > BLOCK_SIZE; delta >>= 1) {
+            // for(uint delta = width; delta > 0; delta >>= 1) {
                 for(uint block = 0; block < width; block += BLOCK_SIZE) {
                     uint idx = block + gl_LocalInvocationID.x;
                     uint base = (idx & (delta-1)) | ((idx & ~(delta-1)) << 1);
+                    
+                    #ifdef SORT_PPOS
+                    vec4 lhs     = edata[gl_WorkGroupID.x].ppos[start + i + base        ];
+                    vec4 rhs     = edata[gl_WorkGroupID.x].ppos[start + i + base + delta];
+                    vec4 lhs_vel = edata[gl_WorkGroupID.x].pvel[start + i + base        ];
+                    vec4 rhs_vel = edata[gl_WorkGroupID.x].pvel[start + i + base + delta];
+                    #else
                     vec4 lhs = res[start + i + base        ];
                     vec4 rhs = res[start + i + base + delta];
+                    #endif
                     barrier();
                     if((compare(lhs, rhs) ^ reverse) != 0) {
                         vec4 tmp = rhs;
                         rhs = lhs;
                         lhs = tmp;
-                    } 
+                        #ifdef SORT_PPOS
+                        tmp = rhs_vel;
+                        rhs_vel = lhs_vel;
+                        lhs_vel = tmp;
+                        #endif
+                    }
+                    #ifdef SORT_PPOS
+                    edata[gl_WorkGroupID.x].ppos[start + i + base        ] = lhs;
+                    edata[gl_WorkGroupID.x].ppos[start + i + base + delta] = rhs;
+                    edata[gl_WorkGroupID.x].pvel[start + i + base        ] = lhs_vel;
+                    edata[gl_WorkGroupID.x].pvel[start + i + base + delta] = rhs_vel;
+                    #else
                     res[start + i + base        ] = lhs;
                     res[start + i + base + delta] = rhs;
+                    #endif
                     barrier();
                 }
             }
-            // sortCached(start + i, reverse);
+            for(uint block = 0; block < 2 * width; block += 2 * BLOCK_SIZE) {
+                sortCached(start + i + block, reverse);
+            }
+
         }
     }
     barrier();
 }
 
-uint ceilPowerOfTwo(uint v) {
-    v--;
-    v |= v >> 1;
-    v |= v >> 2;
-    v |= v >> 4;
-    v |= v >> 8;
-    v |= v >> 16;
-    v++;
-    return v;
-}
 
 void sortParticles(uint emitterIndex) {
     uint n = cmd[emitterIndex].instanceCount;
-    uint size = ceilPowerOfTwo(max(n, 64u));
+    #ifdef SORT_PPOS
+    uint offset = 0;
+    uint size = N_MAX_PARTICLES_PER_EMITTER;
+    #else
     uint offset = cmd[emitterIndex].firstInstance;
-    for(uint i = 0; i < size; i += BLOCK_SIZE) {
-        if(i + gl_LocalInvocationID.x >= n) {
-            res[offset + i + gl_LocalInvocationID.x] = vec4(0, 0, 0, 2);
-        }
-        barrier();
-    }
+    uint size = ceilPowerOfTwo(max(n, 64u));
+    #endif
+#ifdef SORT_PPOS
     bitonicSort(offset, size);
+    moveToRes(emitterIndex);
+#else
+    moveToRes(emitterIndex);
+    bitonicSort(offset, size);
+#endif
 }
 
 uint typeVertexCount(uint type) {
@@ -293,27 +364,19 @@ uint emitterStartPos() {
         einfo[emitterIndex]    .pad[1]  = gl_WorkGroupID.x;
     }
     barrier();
-    for(uint i = 0; i < N_MAX_PARTICLES_PER_EMITTER; i += BLOCK_SIZE) {
-        res[start + i + gl_LocalInvocationID.x] = edata[gl_WorkGroupID.x].ppos[i + gl_LocalInvocationID.x];
-    }
-    barrier();
+    
     return emitterIndex;
 }
+
+
 
 void main() {
     randSeed = 0;
 
-    uint emitterIndex = emitterStartPos();
+    simulateEmitter(0, N_MAX_PARTICLES_PER_EMITTER);
 
-    // simulateEmitter(gl_WorkGroupID.x * 2 * BLOCK_SIZE, 2 * BLOCK_SIZE);
-    // uint eid = gl_WorkGroupID.x;
+    uint emitterIndex = emitterStartPos();
 
     sortParticles(emitterIndex);
     
-    // if(gl_LocalInvocationID.x == 0) {
-    //     cmd[eid].vertexCount = typeVertexCount(einfo[eid].type);
-    //     cmd[eid].instanceCount = 64;//einfo[eid].count;
-    //     cmd[eid].firstVertex   = 0;
-    //     cmd[eid].firstInstance = eid * 2 * BLOCK_SIZE;
-    // }
 }

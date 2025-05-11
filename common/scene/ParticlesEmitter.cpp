@@ -35,6 +35,10 @@ ParticlesEmitter::allocate()
         .name = "emitter_gpu_data",
     });
     m_gpuData.map();
+    auto* ppos = reinterpret_cast<glm::vec4* >(m_gpuData.data());
+    for(std::size_t i = 0; i < N_MAX_PARTICLES_PER_EMITTER; i++) {
+        ppos[i] = glm::vec4(0, 0, 0, 2);
+    }
 }
 
 
@@ -69,6 +73,7 @@ void
 ParticlesEmitter::update(glm::vec4 z_view, float time)
 {
     m_camZ = glm::dot(m_info.position, z_view);
+    #if 0
     float dt = time - m_prevTime;
     for(std::size_t i = 0; i < m_particles.size(); i++) {
         if(time > m_particles[i].birthtime + m_params.lifetime ) {
@@ -97,6 +102,16 @@ ParticlesEmitter::update(glm::vec4 z_view, float time)
     for(std::size_t i = 0; i < m_particles.size(); i++) {
         ppos[i] = m_particles[i].position;
         pvel[i] = m_particles[i].velocity;
+    }
+    #endif
+    m_prevTime = time;
+    m_info.fadeBezier[0] = m_bezier[0];
+    m_info.fadeBezier[1] = m_bezier[1];
+    m_info.fadeBezier[2] = m_bezier[2];
+    m_info.fadeBezier[3] = m_bezier[3];
+    if(time - m_lastSpawnTime > m_params.rate) {
+        emitParticle();
+        m_lastSpawnTime = time;
     }
 }
 
@@ -146,12 +161,10 @@ void
 ParticlesEmitter::emitParticle() {
     glm::vec4 position = glm::vec4{glm::vec3(m_info.position), 0} + m_params.spawnRadius * rand3fz();
     glm::vec3 velocity = m_params.maxSpeed * glm::mix(1.f, randf(), m_params.speedRandomFactor) * glm::mix(glm::normalize(rand3f()), m_params.direction, m_params.directionFactor); 
-
-    m_particles.emplace_back(
-        position, 
-        glm::vec4(velocity, 0), 
-        m_lastSpawnTime
-    );
+    auto* ppos = reinterpret_cast<glm::vec4* >(m_gpuData.data());
+    auto* pvel = ppos + N_MAX_PARTICLES_PER_EMITTER;
+    ppos[N_MAX_PARTICLES_PER_EMITTER-1] = position;
+    pvel[N_MAX_PARTICLES_PER_EMITTER-1] = glm::vec4(velocity, 1.f / m_params.lifetime);
 }
 
 }
